@@ -22,7 +22,8 @@ Route::post('logout', [AuthenticatedSessionController::class, 'destroy'])
     ->name('logout');
 
 Route::middleware('auth')->group(function () {
-    Route::get('/', DashboardController::class)->name('dashboard');
+    Route::redirect('/', '/home');
+    Route::get('/home', DashboardController::class)->name('dashboard');
 
     Route::get('workouts', [WorkoutController::class, 'index'])->name('workouts.index');
     Route::post('workouts/start/{workoutType}', [WorkoutController::class, 'start'])->name('workouts.start');
