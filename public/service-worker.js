@@ -1,4 +1,4 @@
-const CACHE_NAME = 'ppl-tracker-v1';
+const CACHE_NAME = 'workout-tracker-v2';
 const APP_SHELL = [
     './',
     './manifest.webmanifest',

@@ -3,5 +3,5 @@
     <path d="M118 282h276v56H118z" fill="#a3e635"/>
     <path d="M74 238h52v144H74zm312 0h52v144h-52z" fill="#f59e0b"/>
     <path d="M160 168h192v56H160z" fill="#f4f4f5"/>
-    <text x="256" y="442" text-anchor="middle" font-family="Arial, sans-serif" font-size="72" font-weight="900" fill="#f4f4f5">PPL</text>
+    <text x="256" y="442" text-anchor="middle" font-family="Arial, sans-serif" font-size="84" font-weight="900" fill="#f4f4f5">WT</text>
 </svg>

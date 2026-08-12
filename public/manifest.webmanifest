@@ -1,7 +1,7 @@
 {
-    "name": "PPL Tracker",
-    "short_name": "PPL Tracker",
-    "description": "Mobile-first Push Legs Pull workout tracking.",
+    "name": "Workout tracker",
+    "short_name": "Workout tracker",
+    "description": "Mobile-first workout tracking.",
     "start_url": ".",
     "scope": ".",
     "display": "standalone",

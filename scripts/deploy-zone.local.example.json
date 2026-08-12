@@ -1,0 +1,12 @@
+{
+    "SshUser": "zone-ssh-user",
+    "SshHost": "zone-ssh-host-or-ip",
+    "HostKeyAlias": "zone-host-key-alias",
+    "IdentityFile": "C:\\Users\\YourName\\.ssh\\id_ed25519",
+    "RemoteApp": "/absolute/private/app/path",
+    "RemoteBareRepo": "/absolute/private/app.git",
+    "RemoteWeb": "/absolute/public/web/path",
+    "PublicUrl": "https://example.com/path/",
+    "MailFromAddress": "hello@example.com",
+    "AppName": "Workout tracker"
+}

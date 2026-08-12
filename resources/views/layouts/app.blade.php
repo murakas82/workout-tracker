@@ -6,7 +6,7 @@
         <meta name="theme-color" content="#18181b">
         <meta name="service-worker-url" content="{{ asset('service-worker.js') }}">
         <link rel="manifest" href="{{ asset('manifest.webmanifest') }}">
-        <title>{{ config('app.name', 'PPL Tracker') }}</title>
+        <title>{{ config('app.name', 'Workout tracker') }}</title>
         @vite(['resources/css/app.css', 'resources/js/app.js'])
     </head>
     <body>
@@ -15,7 +15,7 @@
         <div class="app-shell">
             <header class="sticky top-0 z-20 border-b border-zinc-800 bg-zinc-950/95 px-4 py-3 backdrop-blur">
                 <div class="flex items-center justify-between gap-3">
-                    <a href="{{ route('dashboard') }}" class="text-lg font-black uppercase text-zinc-50">PPL Tracker</a>
+                    <a href="{{ route('dashboard') }}" class="text-lg font-black uppercase text-zinc-50">Workout tracker</a>
 
                     <div class="flex items-center gap-3">
                         <button type="button" class="hidden rounded-lg border border-lime-400/40 bg-lime-400/10 px-3 py-2 text-xs font-black uppercase text-lime-200" data-pwa-install>

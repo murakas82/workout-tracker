@@ -3,7 +3,7 @@
 @section('content')
     <section class="space-y-6">
         <div>
-            <p class="text-sm font-bold uppercase text-lime-300">PPL Tracker</p>
+            <p class="text-sm font-bold uppercase text-lime-300">Workout tracker</p>
             <h1 class="mt-2 text-3xl font-black text-zinc-50">Create account</h1>
         </div>
 

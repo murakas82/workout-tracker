@@ -19,6 +19,7 @@
 /public/fonts-manifest.dev.json
 /public/hot
 /public/storage
+/scripts/deploy-zone.local.json
 /storage/*.key
 /storage/pail
 /vendor
