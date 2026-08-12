@@ -25,7 +25,7 @@ param(
     [string] $HostKeyAlias,
     [string] $IdentityFile,
     [string] $RemoteApp,
-    [string] $RemoteBareRepo,
+    [string] $RemoteGitUrl,
     [string] $RemoteWeb,
     [string] $PublicUrl,
     [string] $MailFromAddress,
@@ -158,7 +158,7 @@ function Resolve-Settings {
     $script:HostKeyAlias = Resolve-DeploySetting -Name "HostKeyAlias" -Value $HostKeyAlias -Required
     $script:IdentityFile = Resolve-DeploySetting -Name "IdentityFile" -Value $IdentityFile -Required
     $script:RemoteApp = Resolve-DeploySetting -Name "RemoteApp" -Value $RemoteApp -Required
-    $script:RemoteBareRepo = Resolve-DeploySetting -Name "RemoteBareRepo" -Value $RemoteBareRepo -Required
+    $script:RemoteGitUrl = Resolve-DeploySetting -Name "RemoteGitUrl" -Value $RemoteGitUrl -Required
     $script:RemoteWeb = Resolve-DeploySetting -Name "RemoteWeb" -Value $RemoteWeb -Required
     $script:PublicUrl = Resolve-DeploySetting -Name "PublicUrl" -Value $PublicUrl -Required
     $script:MailFromAddress = Resolve-DeploySetting -Name "MailFromAddress" -Value $MailFromAddress -Default "hello@example.com"
@@ -219,11 +219,7 @@ function Push-Code {
         Invoke-Git -Arguments @("push", "origin", "main")
     }
 
-    $identityForGit = $script:IdentityFile.Replace("\", "/")
-    $gitSshCommand = "ssh -i $identityForGit -o IdentitiesOnly=yes -o HostKeyAlias=$script:HostKeyAlias"
-    $zoneRepo = "ssh://$script:SshUser@$script:SshHost$script:RemoteBareRepo"
-
-    Invoke-Git -Arguments @("-c", "core.sshCommand=$gitSshCommand", "push", $zoneRepo, "HEAD:main")
+    Write-Host "Remote host will pull the pushed commit from GitHub." -ForegroundColor DarkGray
 }
 
 function New-RemoteDeployScript {
@@ -231,8 +227,8 @@ function New-RemoteDeployScript {
 set -euo pipefail
 
 APP=__REMOTE_APP__
-BARE=__REMOTE_BARE_REPO__
 WEB=__REMOTE_WEB__
+REPO_URL=__REMOTE_GIT_URL__
 PUBLIC_URL=__PUBLIC_URL__
 BASE_URI_PATH=__PUBLIC_BASE_PATH__
 APP_NAME=__APP_NAME__
@@ -244,11 +240,10 @@ fail() {
 }
 
 case "$APP" in /*) ;; *) fail "RemoteApp must be an absolute path." ;; esac
-case "$BARE" in /*.git) ;; *) fail "RemoteBareRepo must be an absolute .git path." ;; esac
 case "$WEB" in /*) ;; *) fail "RemoteWeb must be an absolute path." ;; esac
+case "$REPO_URL" in git@*:*|ssh://*|https://*) ;; *) fail "RemoteGitUrl must be a Git SSH or HTTPS URL." ;; esac
 
 [ "$APP" != "/" ] || fail "Refusing to deploy to /."
-[ "$BARE" != "/" ] || fail "Refusing to use / as bare repo."
 [ "$WEB" != "/" ] || fail "Refusing to publish to /."
 
 APP_URL="${PUBLIC_URL%/}"
@@ -263,12 +258,23 @@ if [ -z "$BASE_URI_PATH" ]; then
 fi
 
 mkdir -p "$APP" "$WEB"
-if [ ! -d "$BARE" ]; then
-    git init --bare "$BARE"
+cd "$APP"
+
+if [ ! -d .git ]; then
+    git init
+    git symbolic-ref HEAD refs/heads/main
 fi
 
-git --git-dir="$BARE" --work-tree="$APP" checkout -f main
-cd "$APP"
+if git remote get-url origin >/dev/null 2>&1; then
+    git remote set-url origin "$REPO_URL"
+else
+    git remote add origin "$REPO_URL"
+fi
+
+git fetch --prune origin main
+git symbolic-ref HEAD refs/heads/main
+git reset --hard FETCH_HEAD
+git branch --set-upstream-to=origin/main main >/dev/null 2>&1 || true
 
 EXISTING_KEY=""
 if [ -f .env ]; then
@@ -398,8 +404,8 @@ echo "DEPLOYED $PUBLIC_URL"
 
     return ($script.
         Replace("__REMOTE_APP__", (ConvertTo-BashSingleQuoted -Value $script:RemoteApp)).
-        Replace("__REMOTE_BARE_REPO__", (ConvertTo-BashSingleQuoted -Value $script:RemoteBareRepo)).
         Replace("__REMOTE_WEB__", (ConvertTo-BashSingleQuoted -Value $script:RemoteWeb)).
+        Replace("__REMOTE_GIT_URL__", (ConvertTo-BashSingleQuoted -Value $script:RemoteGitUrl)).
         Replace("__PUBLIC_URL__", (ConvertTo-BashSingleQuoted -Value $script:PublicUrl)).
         Replace("__PUBLIC_BASE_PATH__", (ConvertTo-BashSingleQuoted -Value $script:PublicBasePath)).
         Replace("__APP_NAME__", (ConvertTo-BashSingleQuoted -Value $script:AppName)).
