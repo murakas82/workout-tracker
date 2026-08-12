@@ -13,26 +13,28 @@
         @php($activeWorkout = $activeWorkout ?? false)
 
         <div class="app-shell">
-            <header class="sticky top-0 z-20 border-b border-zinc-800 bg-zinc-950/95 px-4 py-3 backdrop-blur">
-                <div class="flex items-center justify-between gap-3">
-                    <a href="{{ route('dashboard') }}" class="text-lg font-black uppercase text-zinc-50">Workout tracker</a>
+            @unless ($activeWorkout)
+                <header class="sticky top-0 z-20 border-b border-zinc-800 bg-zinc-950/95 px-4 py-3 backdrop-blur">
+                    <div class="flex items-center justify-between gap-3">
+                        <a href="{{ route('dashboard') }}" class="text-lg font-black uppercase text-zinc-50">Workout tracker</a>
 
-                    <div class="flex items-center gap-3">
-                        <button type="button" class="hidden rounded-lg border border-lime-400/40 bg-lime-400/10 px-3 py-2 text-xs font-black uppercase text-lime-200" data-pwa-install>
-                            Install app
-                        </button>
+                        <div class="flex items-center gap-3">
+                            <button type="button" class="hidden rounded-lg border border-lime-400/40 bg-lime-400/10 px-3 py-2 text-xs font-black uppercase text-lime-200" data-pwa-install>
+                                Install app
+                            </button>
 
-                        @auth
-                            <form method="POST" action="{{ route('logout') }}">
-                                @csrf
-                                <button class="text-sm font-bold text-zinc-400" type="submit">Log out</button>
-                            </form>
-                        @endauth
+                            @auth
+                                <form method="POST" action="{{ route('logout') }}">
+                                    @csrf
+                                    <button class="text-sm font-bold text-zinc-400" type="submit">Log out</button>
+                                </form>
+                            @endauth
+                        </div>
                     </div>
-                </div>
-            </header>
+                </header>
+            @endunless
 
-            <main class="{{ $activeWorkout ? 'px-4 pb-6 pt-4' : 'px-4 pb-28 pt-4' }}">
+            <main class="{{ $activeWorkout ? 'px-3 pb-24 pt-3' : 'px-4 pb-28 pt-4' }}">
                 @if (session('status'))
                     <div class="mb-4 rounded-lg border border-lime-400/30 bg-lime-400/10 p-3 text-sm font-semibold text-lime-100">
                         {{ session('status') }}

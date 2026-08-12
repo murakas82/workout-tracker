@@ -37,122 +37,121 @@
         };
     @endphp
 
-    <section class="space-y-4">
-        <div class="flex items-center justify-between gap-3">
-            <a class="button-secondary w-auto" href="{{ route('dashboard') }}">Close</a>
-            <p class="text-sm font-black uppercase text-lime-300">Exercise {{ $exercise->position }} of {{ $totalExercises }}</p>
+    <section class="active-workout-screen">
+        <div class="flex items-center justify-between gap-2">
+            <a class="button-secondary button-compact w-auto" href="{{ route('dashboard') }}">Close</a>
+            <p class="text-xs font-black uppercase text-lime-300">Exercise {{ $exercise->position }} of {{ $totalExercises }}</p>
         </div>
 
-        <div>
-            <p class="text-sm font-bold uppercase text-zinc-400">{{ $workout->workoutType->name }}</p>
-            <h1 class="mt-2 text-3xl font-black leading-tight text-zinc-50">{{ $exercise->name }}</h1>
-        </div>
-
-        <div class="stat-grid">
-            <div class="stat">
-                <p class="text-xs font-bold uppercase text-zinc-400">Target</p>
-                <p class="mt-1 text-xl font-black">{{ $exercise->working_sets }} x {{ $exercise->min_reps }}-{{ $exercise->max_reps }}</p>
+        <div class="space-y-1">
+            <div class="flex items-center justify-between gap-2 text-xs font-bold uppercase text-zinc-400">
+                <span>{{ $workout->workoutType->name }}</span>
+                <span>{{ $exercise->working_sets }} x {{ $exercise->min_reps }}-{{ $exercise->max_reps }} reps | {{ $exercise->restLabel() }}</span>
             </div>
-            <div class="stat">
-                <p class="text-xs font-bold uppercase text-zinc-400">Rest</p>
-                <p class="mt-1 text-xl font-black">{{ $exercise->restLabel() }}</p>
-            </div>
+            <h1 class="text-2xl font-black leading-tight text-zinc-50">{{ $exercise->name }}</h1>
         </div>
 
-        <div class="panel">
-            <h2 class="font-black">Previous Workout</h2>
+        <div class="active-workout-previous">
+            <p class="text-xs font-black uppercase text-zinc-500">Previous</p>
             @if ($previous)
-                <p class="mt-3 text-3xl font-black">{{ $progression->displayWeight($previous->sets) }}</p>
-                @if ($previous->unilateral)
-                    <p class="mt-1 text-zinc-400">Left {{ $progression->repsLine($previous->sets, 'left') }}</p>
-                    <p class="text-zinc-400">Right {{ $progression->repsLine($previous->sets, 'right') }}</p>
-                @else
-                    <p class="mt-1 text-zinc-400">{{ $progression->repsLine($previous->sets) }}</p>
-                @endif
-                <p class="mt-3 inline-flex rounded bg-zinc-800 px-2 py-1 text-xs font-black uppercase text-lime-300">{{ $progression->label($previous->progression_result) }}</p>
+                <div class="min-w-0 flex-1">
+                    <p class="truncate text-base font-black text-zinc-100">{{ $progression->displayWeight($previous->sets) }}</p>
+                    @if ($previous->unilateral)
+                        <p class="truncate text-xs text-zinc-400">L {{ $progression->repsLine($previous->sets, 'left') }} | R {{ $progression->repsLine($previous->sets, 'right') }}</p>
+                    @else
+                        <p class="truncate text-xs text-zinc-400">{{ $progression->repsLine($previous->sets) }}</p>
+                    @endif
+                </div>
+                <p class="rounded bg-zinc-800 px-2 py-1 text-[11px] font-black uppercase text-lime-300">{{ $progression->label($previous->progression_result) }}</p>
             @else
-                <p class="mt-2 text-zinc-400">No previous session for this exercise.</p>
+                <p class="flex-1 text-sm text-zinc-400">No previous session.</p>
             @endif
         </div>
 
-        <form method="POST" action="{{ route('workouts.exercises.save', [$workout, $exercise]) }}" class="space-y-4">
+        <form method="POST" action="{{ route('workouts.exercises.save', [$workout, $exercise]) }}" class="active-workout-form">
             @csrf
 
             @if ($exercise->unilateral)
                 @foreach (['left' => 'Left', 'right' => 'Right'] as $side => $label)
-                    <div class="panel space-y-3">
-                        <h2 class="text-xl font-black">{{ $label }}</h2>
+                    <div class="panel panel-compact space-y-2">
+                        <h2 class="text-base font-black">{{ $label }}</h2>
                         @for ($set = 1; $set <= $exercise->working_sets; $set++)
-                            <div class="grid grid-cols-[1fr_1fr] gap-3">
-                                <div class="space-y-2">
-                                    <label for="working_{{ $side }}_{{ $set }}_weight">{{ $label }} set {{ $set }} weight</label>
-                                    <input id="working_{{ $side }}_{{ $set }}_weight" name="working[{{ $side }}][{{ $set }}][weight]" value="{{ $workingValue($side, $set, 'weight') }}" inputmode="decimal" type="number" min="0" step="0.5" {{ $set === 1 ? 'data-copy-source=weight data-copy-group='.$side : 'data-copy-target='.$side }}>
+                            <div class="active-set-row">
+                                <p class="set-number">{{ $set }}</p>
+                                <div>
+                                    <label class="sr-only" for="working_{{ $side }}_{{ $set }}_weight">{{ $label }} set {{ $set }} weight</label>
+                                    <input class="input-compact" id="working_{{ $side }}_{{ $set }}_weight" name="working[{{ $side }}][{{ $set }}][weight]" value="{{ $workingValue($side, $set, 'weight') }}" placeholder="Weight" inputmode="decimal" type="number" min="0" step="0.5" {{ $set === 1 ? 'data-copy-source=weight data-copy-group='.$side : 'data-copy-target='.$side }}>
                                 </div>
-                                <div class="space-y-2">
-                                    <label for="working_{{ $side }}_{{ $set }}_reps">Reps</label>
-                                    <input id="working_{{ $side }}_{{ $set }}_reps" name="working[{{ $side }}][{{ $set }}][reps]" value="{{ $workingValue($side, $set, 'reps') }}" inputmode="numeric" type="number" min="1" step="1">
+                                <div>
+                                    <label class="sr-only" for="working_{{ $side }}_{{ $set }}_reps">{{ $label }} set {{ $set }} reps</label>
+                                    <input class="input-compact" id="working_{{ $side }}_{{ $set }}_reps" name="working[{{ $side }}][{{ $set }}][reps]" value="{{ $workingValue($side, $set, 'reps') }}" placeholder="Reps" inputmode="numeric" type="number" min="1" step="1">
                                 </div>
                             </div>
                         @endfor
                     </div>
                 @endforeach
             @else
-                <div class="panel space-y-3">
+                <div class="panel panel-compact space-y-2">
                     @for ($set = 1; $set <= $exercise->working_sets; $set++)
-                        <div class="grid grid-cols-[1fr_1fr] gap-3">
-                            <div class="space-y-2">
-                                <label for="working_{{ $set }}_weight">Set {{ $set }} weight</label>
-                                <input id="working_{{ $set }}_weight" name="working[{{ $set }}][weight]" value="{{ $workingValue(null, $set, 'weight') }}" inputmode="decimal" type="number" min="0" step="0.5" {{ $set === 1 ? 'data-copy-source=weight data-copy-group=main' : 'data-copy-target=main' }}>
+                        <div class="active-set-row">
+                            <p class="set-number">{{ $set }}</p>
+                            <div>
+                                <label class="sr-only" for="working_{{ $set }}_weight">Set {{ $set }} weight</label>
+                                <input class="input-compact" id="working_{{ $set }}_weight" name="working[{{ $set }}][weight]" value="{{ $workingValue(null, $set, 'weight') }}" placeholder="Weight" inputmode="decimal" type="number" min="0" step="0.5" {{ $set === 1 ? 'data-copy-source=weight data-copy-group=main' : 'data-copy-target=main' }}>
                             </div>
-                            <div class="space-y-2">
-                                <label for="working_{{ $set }}_reps">Reps</label>
-                                <input id="working_{{ $set }}_reps" name="working[{{ $set }}][reps]" value="{{ $workingValue(null, $set, 'reps') }}" inputmode="numeric" type="number" min="1" step="1">
+                            <div>
+                                <label class="sr-only" for="working_{{ $set }}_reps">Set {{ $set }} reps</label>
+                                <input class="input-compact" id="working_{{ $set }}_reps" name="working[{{ $set }}][reps]" value="{{ $workingValue(null, $set, 'reps') }}" placeholder="Reps" inputmode="numeric" type="number" min="1" step="1">
                             </div>
                         </div>
                     @endfor
                 </div>
             @endif
 
-            <div class="panel space-y-3" x-data="{ drops: {{ count($dropInput) }} }">
-                <div class="flex items-center justify-between gap-3">
-                    <h2 class="font-black">Drop Sets</h2>
-                    <button class="button-secondary w-auto" type="button" x-on:click="drops++">+ Add Drop Set</button>
+            <div class="panel panel-compact space-y-2" x-data="{ open: {{ count($dropInput) > 0 ? 'true' : 'false' }}, drops: {{ count($dropInput) }} }">
+                <div class="flex items-center justify-between gap-2">
+                    <button class="text-sm font-black text-zinc-300" type="button" x-on:click="open = !open">
+                        Drop sets <span class="text-zinc-500" x-text="open ? '-' : '+'"></span>
+                    </button>
+                    <button class="button-secondary button-compact w-auto" type="button" x-on:click="open = true; drops++">Add</button>
                 </div>
 
-                @for ($i = 0; $i < $dropSlots; $i++)
-                    @php($drop = $dropInput[$i] ?? [])
-                    <div class="grid grid-cols-{{ $exercise->unilateral ? '3' : '2' }} gap-3" x-show="drops > {{ $i }}" x-cloak>
-                        @if ($exercise->unilateral)
-                            <div class="space-y-2">
-                                <label for="drop_{{ $i }}_side">Side</label>
-                                <select id="drop_{{ $i }}_side" name="drops[{{ $i }}][side]">
-                                    <option value="">Side</option>
-                                    <option value="left" @selected(($drop['side'] ?? '') === 'left')>Left</option>
-                                    <option value="right" @selected(($drop['side'] ?? '') === 'right')>Right</option>
-                                </select>
+                <div class="space-y-2" x-show="open" x-cloak>
+                    @for ($i = 0; $i < $dropSlots; $i++)
+                        @php($drop = $dropInput[$i] ?? [])
+                        <div class="grid grid-cols-{{ $exercise->unilateral ? '3' : '2' }} gap-2" x-show="drops > {{ $i }}" x-cloak>
+                            @if ($exercise->unilateral)
+                                <div>
+                                    <label class="sr-only" for="drop_{{ $i }}_side">Side</label>
+                                    <select class="input-compact" id="drop_{{ $i }}_side" name="drops[{{ $i }}][side]">
+                                        <option value="">Side</option>
+                                        <option value="left" @selected(($drop['side'] ?? '') === 'left')>Left</option>
+                                        <option value="right" @selected(($drop['side'] ?? '') === 'right')>Right</option>
+                                    </select>
+                                </div>
+                            @endif
+                            <div>
+                                <label class="sr-only" for="drop_{{ $i }}_weight">Drop set {{ $i + 1 }} weight</label>
+                                <input class="input-compact" id="drop_{{ $i }}_weight" name="drops[{{ $i }}][weight]" value="{{ $drop['weight'] ?? '' }}" placeholder="Weight" inputmode="decimal" type="number" min="0" step="0.5">
                             </div>
-                        @endif
-                        <div class="space-y-2">
-                            <label for="drop_{{ $i }}_weight">Weight</label>
-                            <input id="drop_{{ $i }}_weight" name="drops[{{ $i }}][weight]" value="{{ $drop['weight'] ?? '' }}" inputmode="decimal" type="number" min="0" step="0.5">
+                            <div>
+                                <label class="sr-only" for="drop_{{ $i }}_reps">Drop set {{ $i + 1 }} reps</label>
+                                <input class="input-compact" id="drop_{{ $i }}_reps" name="drops[{{ $i }}][reps]" value="{{ $drop['reps'] ?? '' }}" placeholder="Reps" inputmode="numeric" type="number" min="1" step="1">
+                            </div>
                         </div>
-                        <div class="space-y-2">
-                            <label for="drop_{{ $i }}_reps">Reps</label>
-                            <input id="drop_{{ $i }}_reps" name="drops[{{ $i }}][reps]" value="{{ $drop['reps'] ?? '' }}" inputmode="numeric" type="number" min="1" step="1">
-                        </div>
-                    </div>
-                @endfor
+                    @endfor
+                </div>
             </div>
 
-            <div class="grid grid-cols-2 gap-3">
+            <div class="active-action-bar">
                 @if ($exercise->position > 1)
-                    <a class="button-secondary" href="{{ route('workouts.exercise', [$workout, $exercise->position - 1]) }}">Previous Exercise</a>
+                    <a class="button-secondary button-compact" href="{{ route('workouts.exercise', [$workout, $exercise->position - 1]) }}">Previous</a>
                 @else
                     <span></span>
                 @endif
 
-                <button class="button-primary" type="submit">
-                    {{ $exercise->position >= $totalExercises ? 'Finish Workout' : 'Done - Next Exercise' }}
+                <button class="button-primary button-compact" type="submit">
+                    {{ $exercise->position >= $totalExercises ? 'Finish' : 'Done - Next' }}
                 </button>
             </div>
         </form>

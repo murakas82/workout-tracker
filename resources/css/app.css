@@ -42,12 +42,20 @@
         @apply rounded-lg border border-zinc-800 bg-zinc-900/80 p-4 shadow-sm shadow-black/20;
     }
 
+    .panel-compact {
+        @apply p-3;
+    }
+
     .button-primary {
         @apply inline-flex min-h-14 w-full items-center justify-center rounded-lg bg-lime-400 px-5 py-4 text-center text-base font-black uppercase tracking-normal text-zinc-950 transition hover:bg-lime-300;
     }
 
     .button-secondary {
         @apply inline-flex min-h-12 items-center justify-center rounded-lg border border-zinc-700 bg-zinc-900 px-4 py-3 text-center text-sm font-bold uppercase tracking-normal text-zinc-100 transition hover:border-zinc-500;
+    }
+
+    .button-compact {
+        @apply min-h-10 px-3 py-2 text-xs;
     }
 
     .button-danger {
@@ -68,5 +76,31 @@
 
     .bottom-nav-link-active {
         @apply bg-zinc-800 text-lime-300;
+    }
+
+    .input-compact {
+        @apply min-h-11 px-3 py-2 text-base;
+    }
+
+    .active-workout-screen,
+    .active-workout-form {
+        @apply space-y-3;
+    }
+
+    .active-workout-previous {
+        @apply flex items-center gap-3 rounded-lg border border-zinc-800 bg-zinc-900/70 px-3 py-2;
+    }
+
+    .active-set-row {
+        @apply grid items-center gap-2;
+        grid-template-columns: 2rem 1fr 1fr;
+    }
+
+    .set-number {
+        @apply flex h-10 w-8 items-center justify-center rounded-md bg-zinc-800 text-sm font-black text-zinc-300;
+    }
+
+    .active-action-bar {
+        @apply fixed inset-x-0 bottom-0 z-30 mx-auto grid max-w-md grid-cols-2 gap-2 border-t border-zinc-800 bg-zinc-950/95 px-3 py-2 backdrop-blur;
     }
 }
