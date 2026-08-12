@@ -1,0 +1,19 @@
+{
+    "name": "PPL Tracker",
+    "short_name": "PPL Tracker",
+    "description": "Mobile-first Push Legs Pull workout tracking.",
+    "start_url": ".",
+    "scope": ".",
+    "display": "standalone",
+    "background_color": "#18181b",
+    "theme_color": "#a3e635",
+    "orientation": "portrait",
+    "icons": [
+        {
+            "src": "icons/icon.svg",
+            "sizes": "any",
+            "type": "image/svg+xml",
+            "purpose": "any maskable"
+        }
+    ]
+}

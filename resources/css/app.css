@@ -1,0 +1,72 @@
+@import 'tailwindcss';
+
+@source '../../vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php';
+@source '../../storage/framework/views/*.php';
+@source '../views/**/*.blade.php';
+@source '../js/**/*.js';
+
+@theme {
+    --font-sans: 'Instrument Sans', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji',
+        'Segoe UI Symbol', 'Noto Color Emoji';
+}
+
+@layer base {
+    html {
+        color-scheme: dark;
+    }
+
+    body {
+        @apply min-h-screen bg-zinc-950 text-zinc-100 antialiased;
+    }
+
+    [x-cloak] {
+        display: none !important;
+    }
+
+    input,
+    select {
+        @apply w-full rounded-lg border border-zinc-700 bg-zinc-900 px-4 py-3 text-lg text-zinc-50 outline-none transition focus:border-lime-400 focus:ring-2 focus:ring-lime-400/20;
+    }
+
+    label {
+        @apply text-sm font-semibold text-zinc-300;
+    }
+}
+
+@layer components {
+    .app-shell {
+        @apply mx-auto min-h-screen w-full max-w-md bg-zinc-950;
+    }
+
+    .panel {
+        @apply rounded-lg border border-zinc-800 bg-zinc-900/80 p-4 shadow-sm shadow-black/20;
+    }
+
+    .button-primary {
+        @apply inline-flex min-h-14 w-full items-center justify-center rounded-lg bg-lime-400 px-5 py-4 text-center text-base font-black uppercase tracking-normal text-zinc-950 transition hover:bg-lime-300;
+    }
+
+    .button-secondary {
+        @apply inline-flex min-h-12 items-center justify-center rounded-lg border border-zinc-700 bg-zinc-900 px-4 py-3 text-center text-sm font-bold uppercase tracking-normal text-zinc-100 transition hover:border-zinc-500;
+    }
+
+    .button-danger {
+        @apply inline-flex min-h-12 items-center justify-center rounded-lg border border-red-500/40 bg-red-950 px-4 py-3 text-sm font-bold uppercase tracking-normal text-red-100;
+    }
+
+    .stat-grid {
+        @apply grid grid-cols-2 gap-3;
+    }
+
+    .stat {
+        @apply rounded-lg border border-zinc-800 bg-zinc-900 p-3;
+    }
+
+    .bottom-nav-link {
+        @apply flex flex-col items-center justify-center gap-1 rounded-lg px-2 py-2 text-[11px] font-bold uppercase tracking-normal text-zinc-400;
+    }
+
+    .bottom-nav-link-active {
+        @apply bg-zinc-800 text-lime-300;
+    }
+}
