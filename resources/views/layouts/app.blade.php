@@ -4,8 +4,8 @@
         <meta charset="utf-8">
         <meta name="viewport" content="width=device-width, initial-scale=1">
         <meta name="theme-color" content="#18181b">
-        <meta name="service-worker-url" content="{{ url('/service-worker.js') }}">
-        <link rel="manifest" href="{{ url('/manifest.webmanifest') }}">
+        <meta name="service-worker-url" content="{{ asset('service-worker.js') }}">
+        <link rel="manifest" href="{{ asset('manifest.webmanifest') }}">
         <title>{{ config('app.name', 'PPL Tracker') }}</title>
         @vite(['resources/css/app.css', 'resources/js/app.js'])
     </head>
