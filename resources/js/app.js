@@ -3,6 +3,57 @@ import Alpine from 'alpinejs';
 window.Alpine = Alpine;
 Alpine.start();
 
+let deferredInstallPrompt = null;
+
+const isStandalone = () => (
+    window.matchMedia('(display-mode: standalone)').matches
+    || window.navigator.standalone === true
+);
+
+const installButtons = () => document.querySelectorAll('[data-pwa-install]');
+
+const setInstallVisible = (visible) => {
+    installButtons().forEach((button) => {
+        button.classList.toggle('hidden', !visible);
+    });
+};
+
+window.addEventListener('beforeinstallprompt', (event) => {
+    if (isStandalone()) {
+        return;
+    }
+
+    event.preventDefault();
+    deferredInstallPrompt = event;
+    setInstallVisible(true);
+});
+
+window.addEventListener('appinstalled', () => {
+    deferredInstallPrompt = null;
+    setInstallVisible(false);
+});
+
+document.addEventListener('click', async (event) => {
+    const target = event.target;
+
+    if (!(target instanceof Element)) {
+        return;
+    }
+
+    const button = target.closest('[data-pwa-install]');
+
+    if (!button || !deferredInstallPrompt) {
+        return;
+    }
+
+    button.setAttribute('disabled', 'disabled');
+    deferredInstallPrompt.prompt();
+    await deferredInstallPrompt.userChoice.catch(() => null);
+    deferredInstallPrompt = null;
+    setInstallVisible(false);
+    button.removeAttribute('disabled');
+});
+
 document.addEventListener('input', (event) => {
     const input = event.target;
 

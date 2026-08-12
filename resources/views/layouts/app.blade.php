@@ -17,12 +17,18 @@
                 <div class="flex items-center justify-between gap-3">
                     <a href="{{ route('dashboard') }}" class="text-lg font-black uppercase text-zinc-50">PPL Tracker</a>
 
-                    @auth
-                        <form method="POST" action="{{ route('logout') }}">
-                            @csrf
-                            <button class="text-sm font-bold text-zinc-400" type="submit">Log out</button>
-                        </form>
-                    @endauth
+                    <div class="flex items-center gap-3">
+                        <button type="button" class="hidden rounded-lg border border-lime-400/40 bg-lime-400/10 px-3 py-2 text-xs font-black uppercase text-lime-200" data-pwa-install>
+                            Install app
+                        </button>
+
+                        @auth
+                            <form method="POST" action="{{ route('logout') }}">
+                                @csrf
+                                <button class="text-sm font-bold text-zinc-400" type="submit">Log out</button>
+                            </form>
+                        @endauth
+                    </div>
                 </div>
             </header>
 
