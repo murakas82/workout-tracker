@@ -2,7 +2,7 @@
 
 This is my personal workout tracking project.
 
-I built it for learning purposes: to practice Laravel, SQLite, mobile-first UI work, PWA basics, and deploying a PHP app to Zone.ee webhosting. The app is designed around my own workout routine and training history.
+I built it for learning purposes: to practice in VScode with codex using Laravel, SQLite, mobile-first UI work, PWA basics, and deploying a PHP app to Zone.ee webhosting. The app is designed around my own workout routine and training history.
 
 ## Stack
 
