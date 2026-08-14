@@ -1,106 +1,63 @@
 # Workout tracker
 
-Mobile-first Laravel workout tracker.
+This is my personal workout tracking project.
 
-## Requirements
+I built it for learning purposes: to practice Laravel, SQLite, mobile-first UI work, PWA basics, and deploying a PHP app to Zone.ee webhosting. The app is designed around my own workout routine and training history.
 
-- PHP 8.3+
-- Composer
-- Node.js and npm
-- SQLite PHP extension
+## Stack
 
-## Quick Start
+- Laravel
+- SQLite
+- Blade
+- Tailwind CSS
+- Vite
+- Alpine.js
 
-Clone the project, install everything, and prepare the local database:
-
-PowerShell:
-
-```powershell
-git clone https://github.com/murakas82/workout.git
-cd workout
-composer setup
-```
-
-Git Bash:
+## Run Locally
 
 ```bash
-git clone https://github.com/murakas82/workout.git
-cd workout
+git clone https://github.com/murakas82/workout-tracker.git
+cd workout-tracker
 composer setup
-```
-
-The setup command installs PHP and Node dependencies, creates `.env`, creates
-`database/database.sqlite`, generates the app key, runs migrations with seed
-data, and builds the frontend assets.
-
-Then start the app in either shell:
-
-```powershell
 php artisan serve
 ```
 
 Open the URL printed by Laravel.
 
-If `php` is not on PATH, run Artisan through Composer:
-
-```powershell
-composer exec -- php artisan serve
-```
-
-## Manual Setup
-
-If you prefer to run each step yourself:
-
-PowerShell:
-
-```powershell
-composer install
-npm install
-Copy-Item .env.example .env
-New-Item -ItemType File -Force database\database.sqlite
-composer exec -- php artisan key:generate
-composer exec -- php artisan migrate --seed
-npm run build
-```
-
-Git Bash:
+If `php` is not available directly on PATH:
 
 ```bash
-composer install
-npm install
-cp .env.example .env
-touch database/database.sqlite
-composer exec -- php artisan key:generate
-composer exec -- php artisan migrate --seed
-npm run build
+composer exec -- php artisan serve
 ```
 
 ## Development
 
-For active development, start Vite:
+Run Vite in one terminal:
 
-```powershell
+```bash
 npm run dev
 ```
 
-In another terminal, start Laravel:
+Run Laravel in another terminal:
 
-```powershell
+```bash
 php artisan serve
 ```
 
-Open the URL printed by Laravel.
+## Tests
 
-## Test
-
-```powershell
-php artisan test
+```bash
+composer exec -- php artisan test
 ```
 
-## Deploy
+## Zone.ee Deployment
 
-Create `scripts\deploy-zone.local.json` from `scripts\deploy-zone.local.example.json`, then run:
+Deployment uses `scripts/deploy-zone.ps1`. Private deployment values are kept in the ignored file `scripts/deploy-zone.local.json`.
 
-```powershell
-.\scripts\deploy-zone.ps1
+From Git Bash:
+
+```bash
+powershell.exe -ExecutionPolicy Bypass -File ./scripts/deploy-zone.ps1
 ```
+
+The deploy script backs up the SQLite database before migrations.
