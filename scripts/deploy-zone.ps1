@@ -19,7 +19,7 @@ and email addresses do not end up in the public repository.
 
 [CmdletBinding()]
 param(
-    [string] $ConfigPath = (Join-Path $PSScriptRoot "deploy-zone.local.json"),
+    [string] $ConfigPath,
     [string] $SshUser,
     [string] $SshHost,
     [string] $HostKeyAlias,
@@ -38,6 +38,16 @@ param(
 
 $ErrorActionPreference = "Stop"
 Set-StrictMode -Version Latest
+
+if ([string]::IsNullOrWhiteSpace($ConfigPath)) {
+    $scriptDirectory = if (-not [string]::IsNullOrWhiteSpace($PSScriptRoot)) {
+        $PSScriptRoot
+    } else {
+        Split-Path -Parent $MyInvocation.MyCommand.Path
+    }
+
+    $ConfigPath = Join-Path $scriptDirectory "deploy-zone.local.json"
+}
 
 $deployConfig = @{}
 if (Test-Path -LiteralPath $ConfigPath) {
