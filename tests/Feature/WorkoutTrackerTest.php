@@ -127,6 +127,39 @@ class WorkoutTrackerTest extends TestCase
         $this->assertNotNull($exercise->refresh()->completed_at);
     }
 
+    public function test_decimal_weight_inputs_accept_hundredths_and_comma_separator(): void
+    {
+        $user = User::factory()->create();
+        $workout = app(WorkoutSessionService::class)->start($user, WorkoutType::query()->where('code', 'push')->first());
+        $exercise = $workout->exercises()->first();
+
+        $this->actingAs($user)
+            ->post(route('workouts.exercises.save', [$workout, $exercise]), [
+                'working' => [
+                    1 => ['weight' => '1,25', 'reps' => 8],
+                    2 => ['weight' => '1.50', 'reps' => 8],
+                    3 => ['weight' => '1,75', 'reps' => 8],
+                ],
+                'drops' => [
+                    ['weight' => '0,75', 'reps' => 10],
+                    ['weight' => '', 'reps' => ''],
+                ],
+            ])
+            ->assertRedirect(route('workouts.exercise', [$workout, 2]));
+
+        $this->assertSame('1.25', $exercise->sets()
+            ->where('set_type', WorkoutSet::TYPE_WORKING)
+            ->where('set_number', 1)
+            ->firstOrFail()
+            ->weight);
+
+        $this->assertSame('0.75', $exercise->sets()
+            ->where('set_type', WorkoutSet::TYPE_DROP)
+            ->where('set_number', 1)
+            ->firstOrFail()
+            ->weight);
+    }
+
     public function test_unfinished_workout_can_be_resumed(): void
     {
         $user = User::factory()->create();

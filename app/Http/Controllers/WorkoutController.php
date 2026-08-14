@@ -187,11 +187,11 @@ class WorkoutController extends Controller
                     ? data_get($working, (string) $setNumber, [])
                     : data_get($working, $side.'.'.$setNumber, []);
 
-                $weight = $row['weight'] ?? null;
+                $weightValue = $this->normalizeWeight($row['weight'] ?? null);
                 $reps = $row['reps'] ?? null;
                 $label = $side ? ucfirst($side).' set '.$setNumber : 'Set '.$setNumber;
 
-                if (! is_numeric($weight) || (float) $weight < 0) {
+                if ($weightValue === null) {
                     $errors['working'] = $label.' needs a valid weight.';
                 }
 
@@ -203,7 +203,7 @@ class WorkoutController extends Controller
                     $sets[] = [
                         'set_number' => $setNumber,
                         'side' => $side,
-                        'weight' => (float) $weight,
+                        'weight' => $weightValue,
                         'reps' => (int) $reps,
                         'set_type' => WorkoutSet::TYPE_WORKING,
                     ];
@@ -219,11 +219,13 @@ class WorkoutController extends Controller
             $reps = $row['reps'] ?? null;
             $side = $exercise->unilateral ? ($row['side'] ?? null) : null;
 
-            if ($weight === null && $reps === null && $side === null) {
+            if ($this->isBlankInput($weight) && $this->isBlankInput($reps) && $this->isBlankInput($side)) {
                 continue;
             }
 
-            if (! is_numeric($weight) || (float) $weight < 0 || ! ctype_digit((string) $reps) || (int) $reps < 1) {
+            $weightValue = $this->normalizeWeight($weight);
+
+            if ($weightValue === null || ! ctype_digit((string) $reps) || (int) $reps < 1) {
                 $errors['drops'] = 'Drop sets need valid weight and reps.';
                 continue;
             }
@@ -236,7 +238,7 @@ class WorkoutController extends Controller
             $sets[] = [
                 'set_number' => $dropNumber++,
                 'side' => $side,
-                'weight' => (float) $weight,
+                'weight' => $weightValue,
                 'reps' => (int) $reps,
                 'set_type' => WorkoutSet::TYPE_DROP,
             ];
@@ -247,5 +249,29 @@ class WorkoutController extends Controller
         }
 
         return $sets;
+    }
+
+    private function normalizeWeight(mixed $weight): ?float
+    {
+        if ($this->isBlankInput($weight)) {
+            return null;
+        }
+
+        if (is_string($weight)) {
+            $weight = str_replace(',', '.', trim($weight));
+        }
+
+        if (! is_numeric($weight)) {
+            return null;
+        }
+
+        $weight = (float) $weight;
+
+        return $weight >= 0 ? $weight : null;
+    }
+
+    private function isBlankInput(mixed $value): bool
+    {
+        return $value === null || (is_string($value) && trim($value) === '');
     }
 }

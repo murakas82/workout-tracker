@@ -80,7 +80,7 @@
                                 <p class="set-number">{{ $set }}</p>
                                 <div>
                                     <label class="sr-only" for="working_{{ $side }}_{{ $set }}_weight">{{ $label }} set {{ $set }} weight</label>
-                                    <input class="input-compact" id="working_{{ $side }}_{{ $set }}_weight" name="working[{{ $side }}][{{ $set }}][weight]" value="{{ $workingValue($side, $set, 'weight') }}" placeholder="Weight" inputmode="decimal" type="number" min="0" step="0.5" {{ $set === 1 ? 'data-copy-source=weight data-copy-group='.$side : 'data-copy-target='.$side }}>
+                                    <input class="input-compact" id="working_{{ $side }}_{{ $set }}_weight" name="working[{{ $side }}][{{ $set }}][weight]" value="{{ $workingValue($side, $set, 'weight') }}" placeholder="Weight" inputmode="decimal" type="number" min="0" step="0.01" {{ $set === 1 ? 'data-copy-source=weight data-copy-group='.$side : 'data-copy-target='.$side }}>
                                 </div>
                                 <div>
                                     <label class="sr-only" for="working_{{ $side }}_{{ $set }}_reps">{{ $label }} set {{ $set }} reps</label>
@@ -97,7 +97,7 @@
                             <p class="set-number">{{ $set }}</p>
                             <div>
                                 <label class="sr-only" for="working_{{ $set }}_weight">Set {{ $set }} weight</label>
-                                <input class="input-compact" id="working_{{ $set }}_weight" name="working[{{ $set }}][weight]" value="{{ $workingValue(null, $set, 'weight') }}" placeholder="Weight" inputmode="decimal" type="number" min="0" step="0.5" {{ $set === 1 ? 'data-copy-source=weight data-copy-group=main' : 'data-copy-target=main' }}>
+                                <input class="input-compact" id="working_{{ $set }}_weight" name="working[{{ $set }}][weight]" value="{{ $workingValue(null, $set, 'weight') }}" placeholder="Weight" inputmode="decimal" type="number" min="0" step="0.01" {{ $set === 1 ? 'data-copy-source=weight data-copy-group=main' : 'data-copy-target=main' }}>
                             </div>
                             <div>
                                 <label class="sr-only" for="working_{{ $set }}_reps">Set {{ $set }} reps</label>
@@ -132,7 +132,7 @@
                             @endif
                             <div>
                                 <label class="sr-only" for="drop_{{ $i }}_weight">Drop set {{ $i + 1 }} weight</label>
-                                <input class="input-compact" id="drop_{{ $i }}_weight" name="drops[{{ $i }}][weight]" value="{{ $drop['weight'] ?? '' }}" placeholder="Weight" inputmode="decimal" type="number" min="0" step="0.5">
+                                <input class="input-compact" id="drop_{{ $i }}_weight" name="drops[{{ $i }}][weight]" value="{{ $drop['weight'] ?? '' }}" placeholder="Weight" inputmode="decimal" type="number" min="0" step="0.01">
                             </div>
                             <div>
                                 <label class="sr-only" for="drop_{{ $i }}_reps">Drop set {{ $i + 1 }} reps</label>
