@@ -233,10 +233,34 @@ PUBLIC_URL=__PUBLIC_URL__
 BASE_URI_PATH=__PUBLIC_BASE_PATH__
 APP_NAME=__APP_NAME__
 MAIL_FROM_ADDRESS=__MAIL_FROM_ADDRESS__
+DB_FILE="$APP/database/database.sqlite"
+BACKUP_DIR="$APP/storage/app/backups"
 
 fail() {
     echo "$1" >&2
     exit 1
+}
+
+backup_database() {
+    if [ ! -s "$DB_FILE" ]; then
+        return
+    fi
+
+    mkdir -p "$BACKUP_DIR"
+
+    BACKUP_FILE="$BACKUP_DIR/database-$(date +%Y%m%d-%H%M%S).sqlite"
+
+    if command -v sqlite3 >/dev/null 2>&1; then
+        sqlite3 "$DB_FILE" ".backup '$BACKUP_FILE'"
+    else
+        cp "$DB_FILE" "$BACKUP_FILE"
+    fi
+
+    chmod 600 "$BACKUP_FILE"
+    find "$BACKUP_DIR" -type f -name 'database-*.sqlite' -mtime +30 -delete
+    find "$BACKUP_DIR" -type f -name 'database-*.sqlite' | sort -r | tail -n +21 | xargs -r rm -f
+
+    echo "Backed up database to $BACKUP_FILE"
 }
 
 case "$APP" in /*) ;; *) fail "RemoteApp must be an absolute path." ;; esac
@@ -320,7 +344,9 @@ VITE_APP_NAME="$APP_NAME"
 EOF
 chmod 600 .env
 
-touch database/database.sqlite
+mkdir -p database storage/app/backups
+backup_database
+touch "$DB_FILE"
 composer install --no-dev --optimize-autoloader --no-interaction
 npm ci
 npm run build
