@@ -11,7 +11,7 @@ use App\Services\WorkoutRotationService;
 use App\Services\WorkoutSessionService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 
@@ -70,6 +70,61 @@ class WorkoutController extends Controller
             'previous' => $this->previousExercise($request, $exercise, $workout),
             'totalExercises' => $workout->exercises->count(),
         ]);
+    }
+
+    public function reorder(Request $request, Workout $workout): View
+    {
+        $this->authorizeActiveWorkout($request, $workout);
+
+        $workout->load('workoutType', 'exercises');
+
+        return view('workouts.reorder', compact('workout'));
+    }
+
+    public function moveExercise(Request $request, Workout $workout, WorkoutExercise $workoutExercise): RedirectResponse
+    {
+        $this->authorizeActiveWorkout($request, $workout);
+        abort_unless($workoutExercise->workout_id === $workout->id, 404);
+
+        $validated = $request->validate([
+            'direction' => ['required', 'in:up,down'],
+        ]);
+
+        if ($workoutExercise->completed_at !== null) {
+            return redirect()->route('workouts.reorder', $workout)->with('status', 'Completed exercises stay locked.');
+        }
+
+        $targetPosition = $workoutExercise->position + ($validated['direction'] === 'up' ? -1 : 1);
+        $target = WorkoutExercise::query()
+            ->where('workout_id', $workout->id)
+            ->where('position', $targetPosition)
+            ->first();
+
+        if (! $target || $target->completed_at !== null) {
+            return redirect()->route('workouts.reorder', $workout)->with('status', 'Only upcoming exercises can be reordered.');
+        }
+
+        DB::transaction(function () use ($workout, $workoutExercise, $target): void {
+            $current = $workoutExercise->fresh();
+            $swap = $target->fresh();
+            $currentPosition = $current->position;
+            $swapPosition = $swap->position;
+
+            $current->forceFill(['position' => 0])->save();
+            $swap->forceFill(['position' => $currentPosition])->save();
+            $current->forceFill(['position' => $swapPosition])->save();
+
+            $nextPosition = WorkoutExercise::query()
+                ->where('workout_id', $workout->id)
+                ->whereNull('completed_at')
+                ->min('position');
+
+            $workout->forceFill([
+                'current_exercise_index' => $nextPosition ?? $workout->exercises()->count(),
+            ])->save();
+        });
+
+        return redirect()->route('workouts.reorder', $workout)->with('status', 'Workout order updated.');
     }
 
     public function saveExercise(
@@ -149,6 +204,12 @@ class WorkoutController extends Controller
     private function authorizeWorkout(Request $request, Workout $workout): void
     {
         abort_unless($workout->user_id === $request->user()->id, 404);
+    }
+
+    private function authorizeActiveWorkout(Request $request, Workout $workout): void
+    {
+        $this->authorizeWorkout($request, $workout);
+        abort_unless($workout->status === Workout::STATUS_IN_PROGRESS, 404);
     }
 
     private function previousExercise(Request $request, WorkoutExercise $exercise, Workout $workout): ?WorkoutExercise

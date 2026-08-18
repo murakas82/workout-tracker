@@ -29,6 +29,8 @@ Route::middleware('auth')->group(function () {
     Route::post('workouts/start/{workoutType}', [WorkoutController::class, 'start'])->name('workouts.start');
     Route::get('workouts/{workout}', [WorkoutController::class, 'show'])->name('workouts.show');
     Route::get('workouts/{workout}/exercise/{position}', [WorkoutController::class, 'show'])->name('workouts.exercise');
+    Route::get('workouts/{workout}/reorder', [WorkoutController::class, 'reorder'])->name('workouts.reorder');
+    Route::post('workouts/{workout}/exercises/{workoutExercise}/move', [WorkoutController::class, 'moveExercise'])->name('workouts.exercises.move');
     Route::post('workouts/{workout}/exercises/{workoutExercise}', [WorkoutController::class, 'saveExercise'])->name('workouts.exercises.save');
     Route::get('workouts/{workout}/summary', [WorkoutController::class, 'summary'])->name('workouts.summary');
     Route::delete('workouts/{workout}', [WorkoutController::class, 'cancel'])->name('workouts.cancel');

@@ -47,11 +47,11 @@
     }
 
     .button-primary {
-        @apply inline-flex min-h-14 w-full items-center justify-center rounded-lg bg-lime-400 px-5 py-4 text-center text-base font-black uppercase tracking-normal text-zinc-950 transition hover:bg-lime-300;
+        @apply inline-flex min-h-14 w-full items-center justify-center rounded-lg bg-lime-400 px-5 py-4 text-center text-base font-black uppercase tracking-normal text-zinc-950 transition hover:bg-lime-300 disabled:cursor-not-allowed disabled:opacity-40;
     }
 
     .button-secondary {
-        @apply inline-flex min-h-12 items-center justify-center rounded-lg border border-zinc-700 bg-zinc-900 px-4 py-3 text-center text-sm font-bold uppercase tracking-normal text-zinc-100 transition hover:border-zinc-500;
+        @apply inline-flex min-h-12 items-center justify-center rounded-lg border border-zinc-700 bg-zinc-900 px-4 py-3 text-center text-sm font-bold uppercase tracking-normal text-zinc-100 transition hover:border-zinc-500 disabled:cursor-not-allowed disabled:opacity-40;
     }
 
     .button-compact {

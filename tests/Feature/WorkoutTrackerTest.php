@@ -189,6 +189,40 @@ class WorkoutTrackerTest extends TestCase
             ->assertSee('Exercise 2 of 7');
     }
 
+    public function test_unfinished_exercises_can_be_reordered_during_active_workout(): void
+    {
+        $user = User::factory()->create();
+        $workout = app(WorkoutSessionService::class)->start($user, WorkoutType::query()->where('code', 'push')->first());
+        $first = $workout->exercises()->where('position', 1)->first();
+        $second = $workout->exercises()->where('position', 2)->first();
+
+        $this->actingAs($user)
+            ->post(route('workouts.exercises.move', [$workout, $second]), ['direction' => 'up'])
+            ->assertRedirect(route('workouts.reorder', $workout));
+
+        $this->assertSame(2, $first->refresh()->position);
+        $this->assertSame(1, $second->refresh()->position);
+        $this->assertSame(1, $workout->refresh()->current_exercise_index);
+    }
+
+    public function test_completed_exercises_cannot_be_reordered_during_active_workout(): void
+    {
+        $user = User::factory()->create();
+        $workout = app(WorkoutSessionService::class)->start($user, WorkoutType::query()->where('code', 'push')->first());
+        $first = $workout->exercises()->where('position', 1)->first();
+        $second = $workout->exercises()->where('position', 2)->first();
+
+        app(WorkoutSessionService::class)->saveExercise($first, $this->setsFor($first, [8, 8, 8]));
+
+        $this->actingAs($user)
+            ->post(route('workouts.exercises.move', [$workout, $second]), ['direction' => 'up'])
+            ->assertRedirect(route('workouts.reorder', $workout));
+
+        $this->assertSame(1, $first->refresh()->position);
+        $this->assertSame(2, $second->refresh()->position);
+        $this->assertSame(2, $workout->refresh()->current_exercise_index);
+    }
+
     public function test_editing_exercise_does_not_change_historical_workout_configuration(): void
     {
         $user = User::factory()->create();

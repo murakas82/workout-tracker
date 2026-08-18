@@ -39,7 +39,10 @@
 
     <section class="active-workout-screen">
         <div class="flex items-center justify-between gap-2">
-            <a class="button-secondary button-compact w-auto" href="{{ route('dashboard') }}">Close</a>
+            <div class="flex items-center gap-2">
+                <a class="button-secondary button-compact w-auto" href="{{ route('dashboard') }}">Close</a>
+                <a class="button-secondary button-compact w-auto" href="{{ route('workouts.reorder', $workout) }}">Order</a>
+            </div>
             <p class="text-xs font-black uppercase text-lime-300">Exercise {{ $exercise->position }} of {{ $totalExercises }}</p>
         </div>
 
