@@ -1,10 +1,9 @@
-@extends('layouts.app', ['activeWorkout' => true])
+@extends('layouts.app')
 
 @section('content')
     @php
         $progression = app(\App\Services\ProgressionService::class);
         $existingSets = $exercise->sets;
-        $previousWeight = $previous ? $progression->primaryWeight($previous->sets) : null;
         $workingInput = old('working', []);
         $dropInput = old('drops', $existingSets->where('set_type', 'drop')->values()->map(fn ($set) => [
             'side' => $set->side,
@@ -12,10 +11,7 @@
             'reps' => $set->reps,
         ])->all());
         $dropSlots = max(3, count($dropInput) + 3);
-        $isLastUnfinished = $exercise->completed_at === null
-            && $workout->exercises->where('position', '>', $exercise->position)->whereNull('completed_at')->isEmpty();
-        $canMoveLater = $exercise->completed_at === null && ! $isLastUnfinished;
-        $workingValue = function (?string $side, int $setNumber, string $field) use ($workingInput, $existingSets, $previousWeight, $exercise, $progression) {
+        $workingValue = function (?string $side, int $setNumber, string $field) use ($workingInput, $existingSets, $progression) {
             $path = $side === null ? $setNumber.'.'.$field : $side.'.'.$setNumber.'.'.$field;
             $oldValue = data_get($workingInput, $path);
             if ($oldValue !== null) {
@@ -28,65 +24,42 @@
                 ->where('set_number', $setNumber)
                 ->first();
 
-            if ($set) {
-                return $field === 'weight' ? $progression->formatWeight((float) $set->weight) : $set->reps;
+            if (! $set) {
+                return '';
             }
 
-            if ($field === 'weight' && $previousWeight !== null) {
-                return $progression->formatWeight($previousWeight);
-            }
-
-            return '';
+            return $field === 'weight' ? $progression->formatWeight((float) $set->weight) : $set->reps;
         };
     @endphp
 
-    <section class="active-workout-screen">
-        <div class="flex items-center justify-between gap-2">
-            <div class="flex items-center gap-2">
-                <a class="button-secondary button-compact w-auto" href="{{ route('dashboard') }}">Close</a>
-                <a class="button-secondary button-compact w-auto" href="{{ route('workouts.reorder', $workout) }}">Order</a>
+    <section class="space-y-5">
+        <div class="flex items-start justify-between gap-3">
+            <div>
+                <p class="text-sm font-bold uppercase text-lime-300">{{ $workout->workoutType->name }}</p>
+                <h1 class="mt-2 text-3xl font-black text-zinc-50">Edit exercise</h1>
             </div>
-            <p class="text-xs font-black uppercase text-lime-300">Exercise {{ $exercise->position }} of {{ $totalExercises }}</p>
+            <a class="button-secondary w-auto" href="{{ route('history.show', $workout) }}#exercise-{{ $exercise->id }}">Cancel</a>
         </div>
 
-        <div class="space-y-1">
-            <div class="flex items-center justify-between gap-2 text-xs font-bold uppercase text-zinc-400">
-                <span>{{ $workout->workoutType->name }}</span>
-                <span>{{ $exercise->working_sets }} x {{ $exercise->min_reps }}-{{ $exercise->max_reps }} reps | {{ $exercise->restLabel() }}</span>
-            </div>
-            <h1 class="text-2xl font-black leading-tight text-zinc-50">{{ $exercise->name }}</h1>
+        <div class="panel space-y-1">
+            <h2 class="text-xl font-black">{{ $exercise->name }}</h2>
+            <p class="text-sm text-zinc-400">{{ $exercise->working_sets }} x {{ $exercise->min_reps }}-{{ $exercise->max_reps }} reps | {{ $exercise->restLabel() }}</p>
         </div>
 
-        <div class="active-workout-previous">
-            <p class="text-xs font-black uppercase text-zinc-500">Previous</p>
-            @if ($previous)
-                <div class="min-w-0 flex-1">
-                    <p class="truncate text-base font-black text-zinc-100">{{ $progression->displayWeight($previous->sets) }}</p>
-                    @if ($previous->unilateral)
-                        <p class="truncate text-xs text-zinc-400">L {{ $progression->repsLine($previous->sets, 'left') }} | R {{ $progression->repsLine($previous->sets, 'right') }}</p>
-                    @else
-                        <p class="truncate text-xs text-zinc-400">{{ $progression->repsLine($previous->sets) }}</p>
-                    @endif
-                </div>
-                <p class="rounded bg-zinc-800 px-2 py-1 text-[11px] font-black uppercase text-lime-300">{{ $progression->label($previous->progression_result) }}</p>
-            @else
-                <p class="flex-1 text-sm text-zinc-400">No previous session.</p>
-            @endif
-        </div>
-
-        <form method="POST" action="{{ route('workouts.exercises.save', [$workout, $exercise]) }}" class="active-workout-form">
+        <form method="POST" action="{{ route('history.exercises.update', [$workout, $exercise]) }}" class="space-y-3">
             @csrf
+            @method('PUT')
 
             @if ($exercise->unilateral)
                 @foreach (['left' => 'Left', 'right' => 'Right'] as $side => $label)
                     <div class="panel panel-compact space-y-2">
-                        <h2 class="text-base font-black">{{ $label }}</h2>
+                        <h3 class="text-base font-black">{{ $label }}</h3>
                         @for ($set = 1; $set <= $exercise->working_sets; $set++)
                             <div class="active-set-row">
                                 <p class="set-number">{{ $set }}</p>
                                 <div>
                                     <label class="sr-only" for="working_{{ $side }}_{{ $set }}_weight">{{ $label }} set {{ $set }} weight</label>
-                                    <input class="input-compact" id="working_{{ $side }}_{{ $set }}_weight" name="working[{{ $side }}][{{ $set }}][weight]" value="{{ $workingValue($side, $set, 'weight') }}" placeholder="Weight" inputmode="decimal" type="number" min="0" step="0.01" {{ $set === 1 ? 'data-copy-source=weight data-copy-group='.$side : 'data-copy-target='.$side }}>
+                                    <input class="input-compact" id="working_{{ $side }}_{{ $set }}_weight" name="working[{{ $side }}][{{ $set }}][weight]" value="{{ $workingValue($side, $set, 'weight') }}" placeholder="Weight" inputmode="decimal" type="number" min="0" step="0.01">
                                 </div>
                                 <div>
                                     <label class="sr-only" for="working_{{ $side }}_{{ $set }}_reps">{{ $label }} set {{ $set }} reps</label>
@@ -103,7 +76,7 @@
                             <p class="set-number">{{ $set }}</p>
                             <div>
                                 <label class="sr-only" for="working_{{ $set }}_weight">Set {{ $set }} weight</label>
-                                <input class="input-compact" id="working_{{ $set }}_weight" name="working[{{ $set }}][weight]" value="{{ $workingValue(null, $set, 'weight') }}" placeholder="Weight" inputmode="decimal" type="number" min="0" step="0.01" {{ $set === 1 ? 'data-copy-source=weight data-copy-group=main' : 'data-copy-target=main' }}>
+                                <input class="input-compact" id="working_{{ $set }}_weight" name="working[{{ $set }}][weight]" value="{{ $workingValue(null, $set, 'weight') }}" placeholder="Weight" inputmode="decimal" type="number" min="0" step="0.01">
                             </div>
                             <div>
                                 <label class="sr-only" for="working_{{ $set }}_reps">Set {{ $set }} reps</label>
@@ -149,28 +122,7 @@
                 </div>
             </div>
 
-            <div class="active-action-bar">
-                <div class="grid {{ $exercise->position > 1 && $canMoveLater ? 'grid-cols-2' : 'grid-cols-1' }} gap-2">
-                    @if ($exercise->position > 1)
-                        <a class="button-secondary button-compact" href="{{ route('workouts.exercise', [$workout, $exercise->position - 1]) }}">Previous</a>
-                    @endif
-
-                    @if ($canMoveLater)
-                        <form method="POST" action="{{ route('workouts.exercises.later', [$workout, $exercise]) }}">
-                            @csrf
-                            <button class="button-secondary button-compact w-full" type="submit">Later</button>
-                        </form>
-                    @endif
-
-                    @if ($exercise->position <= 1 && ! $canMoveLater)
-                        <span></span>
-                    @endif
-                </div>
-
-                <button class="button-primary button-compact" type="submit">
-                    {{ $isLastUnfinished ? 'Finish' : 'Done - Next' }}
-                </button>
-            </div>
+            <button class="button-primary" type="submit">Save changes</button>
         </form>
     </section>
 @endsection

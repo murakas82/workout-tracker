@@ -127,6 +127,50 @@ class WorkoutController extends Controller
         return redirect()->route('workouts.reorder', $workout)->with('status', 'Workout order updated.');
     }
 
+    public function moveExerciseLater(Request $request, Workout $workout, WorkoutExercise $workoutExercise): RedirectResponse
+    {
+        $this->authorizeActiveWorkout($request, $workout);
+        abort_unless($workoutExercise->workout_id === $workout->id, 404);
+
+        $nextPosition = null;
+
+        DB::transaction(function () use ($workout, $workoutExercise, &$nextPosition): void {
+            $unfinished = WorkoutExercise::query()
+                ->where('workout_id', $workout->id)
+                ->whereNull('completed_at')
+                ->orderBy('position')
+                ->get();
+
+            if ($unfinished->count() <= 1 || ! $unfinished->contains('id', $workoutExercise->id)) {
+                $nextPosition = $workoutExercise->position;
+
+                return;
+            }
+
+            $positions = $unfinished->pluck('position')->values();
+            $ordered = $unfinished
+                ->reject(fn (WorkoutExercise $exercise) => $exercise->id === $workoutExercise->id)
+                ->push($workoutExercise->fresh())
+                ->values();
+            $offset = (int) $workout->exercises()->max('position') + 1000;
+
+            foreach ($unfinished as $exercise) {
+                $exercise->forceFill(['position' => $exercise->position + $offset])->save();
+            }
+
+            foreach ($ordered as $index => $exercise) {
+                $exercise->forceFill(['position' => $positions[$index]])->save();
+            }
+
+            $nextPosition = (int) $positions->first();
+            $workout->forceFill(['current_exercise_index' => $nextPosition])->save();
+        });
+
+        return redirect()
+            ->route('workouts.exercise', [$workout, $nextPosition ?? $workoutExercise->position])
+            ->with('status', 'Moved to later.');
+    }
+
     public function saveExercise(
         Request $request,
         Workout $workout,
@@ -140,15 +184,56 @@ class WorkoutController extends Controller
         $sets = $this->extractSets($request, $workoutExercise);
         $sessions->saveExercise($workoutExercise, $sets);
 
-        $total = $workout->exercises()->count();
+        $next = $workout->exercises()
+            ->whereNull('completed_at')
+            ->orderBy('position')
+            ->first();
 
-        if ($workoutExercise->position >= $total) {
+        if (! $next) {
             $sessions->finish($workout);
 
             return redirect()->route('workouts.summary', $workout);
         }
 
-        return redirect()->route('workouts.exercise', [$workout, $workoutExercise->position + 1]);
+        return redirect()->route('workouts.exercise', [$workout, $next->position]);
+    }
+
+    public function editCompletedExercise(Request $request, Workout $workout, WorkoutExercise $workoutExercise): View
+    {
+        $this->authorizeCompletedWorkout($request, $workout);
+        abort_unless($workoutExercise->workout_id === $workout->id, 404);
+
+        $workout->load('workoutType');
+        $workoutExercise->load('sets');
+
+        return view('workouts.edit-exercise', [
+            'workout' => $workout,
+            'exercise' => $workoutExercise,
+        ]);
+    }
+
+    public function updateCompletedExercise(
+        Request $request,
+        Workout $workout,
+        WorkoutExercise $workoutExercise,
+        ProgressionService $progression,
+    ): RedirectResponse {
+        $this->authorizeCompletedWorkout($request, $workout);
+        abort_unless($workoutExercise->workout_id === $workout->id, 404);
+
+        $sets = $this->extractSets($request, $workoutExercise);
+
+        DB::transaction(function () use ($workoutExercise, $sets, $progression): void {
+            $this->replaceExerciseSets($workoutExercise, $sets);
+
+            $workoutExercise->load('sets');
+            $workoutExercise->forceFill([
+                'progression_result' => $progression->evaluate($workoutExercise),
+            ])->save();
+        });
+
+        return redirect(route('history.show', $workout).'#exercise-'.$workoutExercise->id)
+            ->with('status', 'Exercise updated.');
     }
 
     public function summary(Request $request, Workout $workout, ProgressionService $progression): View
@@ -210,6 +295,12 @@ class WorkoutController extends Controller
     {
         $this->authorizeWorkout($request, $workout);
         abort_unless($workout->status === Workout::STATUS_IN_PROGRESS, 404);
+    }
+
+    private function authorizeCompletedWorkout(Request $request, Workout $workout): void
+    {
+        $this->authorizeWorkout($request, $workout);
+        abort_unless($workout->status === Workout::STATUS_COMPLETED, 404);
     }
 
     private function previousExercise(Request $request, WorkoutExercise $exercise, Workout $workout): ?WorkoutExercise
@@ -310,6 +401,25 @@ class WorkoutController extends Controller
         }
 
         return $sets;
+    }
+
+    /**
+     * @param  list<array{set_number:int,side:?string,weight:float,reps:int,set_type:string}>  $sets
+     */
+    private function replaceExerciseSets(WorkoutExercise $exercise, array $sets): void
+    {
+        $exercise->sets()->delete();
+
+        foreach ($sets as $set) {
+            WorkoutSet::query()->create([
+                'workout_exercise_id' => $exercise->id,
+                'set_number' => $set['set_number'],
+                'side' => $set['side'],
+                'weight' => $set['weight'],
+                'reps' => $set['reps'],
+                'set_type' => $set['set_type'],
+            ]);
+        }
     }
 
     private function normalizeWeight(mixed $weight): ?float

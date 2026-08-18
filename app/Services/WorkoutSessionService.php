@@ -85,7 +85,9 @@ class WorkoutSessionService
             ])->save();
 
             $workout = $exercise->workout;
-            $nextIndex = min($exercise->position + 1, $workout->exercises()->count());
+            $nextIndex = $workout->exercises()
+                ->whereNull('completed_at')
+                ->min('position') ?? $workout->exercises()->count();
 
             $workout->forceFill(['current_exercise_index' => $nextIndex])->save();
 

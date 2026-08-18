@@ -10,10 +10,13 @@
         </div>
 
         @foreach ($workout->exercises as $exercise)
-            <div class="panel space-y-3">
-                <div>
-                    <h2 class="text-xl font-black">{{ $exercise->name }}</h2>
-                    <p class="text-sm text-zinc-400">{{ $exercise->working_sets }} x {{ $exercise->min_reps }}-{{ $exercise->max_reps }} | Rest {{ $exercise->restLabel() }}</p>
+            <div id="exercise-{{ $exercise->id }}" class="panel space-y-3">
+                <div class="flex items-start justify-between gap-3">
+                    <div>
+                        <h2 class="text-xl font-black">{{ $exercise->name }}</h2>
+                        <p class="text-sm text-zinc-400">{{ $exercise->working_sets }} x {{ $exercise->min_reps }}-{{ $exercise->max_reps }} | Rest {{ $exercise->restLabel() }}</p>
+                    </div>
+                    <a class="button-secondary button-compact w-auto" href="{{ route('history.exercises.edit', [$workout, $exercise]) }}">Edit</a>
                 </div>
 
                 <div>

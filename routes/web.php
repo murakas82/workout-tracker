@@ -31,11 +31,14 @@ Route::middleware('auth')->group(function () {
     Route::get('workouts/{workout}/exercise/{position}', [WorkoutController::class, 'show'])->name('workouts.exercise');
     Route::get('workouts/{workout}/reorder', [WorkoutController::class, 'reorder'])->name('workouts.reorder');
     Route::post('workouts/{workout}/exercises/{workoutExercise}/move', [WorkoutController::class, 'moveExercise'])->name('workouts.exercises.move');
+    Route::post('workouts/{workout}/exercises/{workoutExercise}/later', [WorkoutController::class, 'moveExerciseLater'])->name('workouts.exercises.later');
     Route::post('workouts/{workout}/exercises/{workoutExercise}', [WorkoutController::class, 'saveExercise'])->name('workouts.exercises.save');
     Route::get('workouts/{workout}/summary', [WorkoutController::class, 'summary'])->name('workouts.summary');
     Route::delete('workouts/{workout}', [WorkoutController::class, 'cancel'])->name('workouts.cancel');
 
     Route::get('history', [HistoryController::class, 'index'])->name('history.index');
+    Route::get('history/{workout}/exercises/{workoutExercise}/edit', [WorkoutController::class, 'editCompletedExercise'])->name('history.exercises.edit');
+    Route::put('history/{workout}/exercises/{workoutExercise}', [WorkoutController::class, 'updateCompletedExercise'])->name('history.exercises.update');
     Route::get('history/{workout}', [HistoryController::class, 'show'])->name('history.show');
 
     Route::get('progress', [ProgressController::class, 'index'])->name('progress.index');

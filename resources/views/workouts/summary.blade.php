@@ -19,7 +19,10 @@
         <div class="space-y-3">
             @foreach ($workout->exercises as $exercise)
                 <div class="panel">
-                    <h2 class="font-black">{{ $exercise->name }}</h2>
+                    <div class="flex items-start justify-between gap-3">
+                        <h2 class="font-black">{{ $exercise->name }}</h2>
+                        <a class="button-secondary button-compact w-auto" href="{{ route('history.exercises.edit', [$workout, $exercise]) }}">Edit</a>
+                    </div>
                     <p class="mt-2 text-2xl font-black">{{ $progression->displayWeight($exercise->sets) }}</p>
                     @if ($exercise->unilateral)
                         <p class="text-sm text-zinc-400">Left {{ $progression->repsLine($exercise->sets, 'left') }}</p>
