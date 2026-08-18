@@ -38,8 +38,8 @@ class DatabaseSeeder extends Seeder
                     ['Seated Leg Curl', 'Hamstrings', 3, 8, 12, 90, 120, false],
                     ['Hip Adductor Machine', 'Adductors', 3, 10, 15, 60, 90, false],
                     ['Hip Abductor Machine', 'Abductors', 3, 12, 20, 60, 90, false],
-                    ['Seated Calf Raise', 'Calves', 3, 10, 15, 90, 90, false],
                     ['Standing Calf Raise', 'Calves', 3, 8, 12, 90, 120, false],
+                    ['Seated Calf Raise', 'Calves', 3, 10, 15, 90, 90, false],
                 ],
             ],
             'pull' => [

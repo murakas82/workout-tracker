@@ -54,6 +54,15 @@ class WorkoutTrackerTest extends TestCase
         $this->assertSame('pull', app(WorkoutRotationService::class)->nextFor($user)->code);
     }
 
+    public function test_new_legs_workouts_put_standing_calf_raise_before_seated_calf_raise(): void
+    {
+        $user = User::factory()->create();
+        $workout = app(WorkoutSessionService::class)->start($user, WorkoutType::query()->where('code', 'legs')->first());
+
+        $this->assertSame('Standing Calf Raise', $workout->exercises->firstWhere('position', 6)->name);
+        $this->assertSame('Seated Calf Raise', $workout->exercises->firstWhere('position', 7)->name);
+    }
+
     public function test_pull_completion_makes_push_next(): void
     {
         $user = User::factory()->create();
