@@ -9,6 +9,8 @@
             <h1 class="mt-2 text-3xl font-black uppercase text-zinc-50">{{ $workout->workoutType->name }}</h1>
         </div>
 
+        @include('workouts.partials.stats', ['stats' => $stats, 'chartData' => $chartData])
+
         @foreach ($workout->exercises as $exercise)
             <div id="exercise-{{ $exercise->id }}" class="panel space-y-3">
                 <div class="flex items-start justify-between gap-3">

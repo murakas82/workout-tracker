@@ -70,6 +70,10 @@
         @apply rounded-lg border border-zinc-800 bg-zinc-900 p-3;
     }
 
+    .chart-frame {
+        @apply relative h-64 w-full;
+    }
+
     .bottom-nav-link {
         @apply flex flex-col items-center justify-center gap-1 rounded-lg px-2 py-2 text-[11px] font-bold uppercase tracking-normal text-zinc-400;
     }

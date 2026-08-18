@@ -9,12 +9,7 @@
             <h1 class="mt-2 text-4xl font-black uppercase text-zinc-50">{{ $workout->workoutType->name }} Completed</h1>
         </div>
 
-        <div class="stat-grid">
-            <div class="stat"><p class="text-xs uppercase text-zinc-400">Exercises</p><p class="text-2xl font-black">{{ $stats['exercises_completed'] }}</p></div>
-            <div class="stat"><p class="text-xs uppercase text-zinc-400">Working Sets</p><p class="text-2xl font-black">{{ $stats['working_sets_completed'] }}</p></div>
-            <div class="stat"><p class="text-xs uppercase text-zinc-400">Weight Up</p><p class="text-2xl font-black">{{ $stats['weight_increased'] }}</p></div>
-            <div class="stat"><p class="text-xs uppercase text-zinc-400">Targets</p><p class="text-2xl font-black">{{ $stats['targets_reached'] }}</p></div>
-        </div>
+        @include('workouts.partials.stats', ['stats' => $stats, 'chartData' => $chartData])
 
         <div class="space-y-3">
             @foreach ($workout->exercises as $exercise)

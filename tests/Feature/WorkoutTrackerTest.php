@@ -9,6 +9,7 @@ use App\Models\WorkoutExercise;
 use App\Models\WorkoutSet;
 use App\Models\WorkoutType;
 use App\Services\ProgressionService;
+use App\Services\WorkoutStatsService;
 use App\Services\WorkoutRotationService;
 use App\Services\WorkoutSessionService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -294,6 +295,24 @@ class WorkoutTrackerTest extends TestCase
             ->firstOrFail()
             ->weight);
         $this->assertSame(ProgressionService::RESULT_INCREASE, $exercise->refresh()->progression_result);
+    }
+
+    public function test_workout_stats_include_volume_and_chart_payloads(): void
+    {
+        $user = User::factory()->create();
+        $workout = $this->completeWorkout($user, 'push')->load('exercises.sets');
+        $stats = app(WorkoutStatsService::class);
+
+        $summary = $stats->forWorkout($workout);
+        $chartData = $stats->chartData($workout);
+
+        $this->assertSame(7, $summary['exercises_completed']);
+        $this->assertSame(21, $summary['working_sets_completed']);
+        $this->assertGreaterThan(0, $summary['total_volume']);
+        $this->assertNotNull($summary['heaviest_set']);
+        $this->assertCount(7, $summary['per_exercise']);
+        $this->assertSame('Incline Smith Machine Bench Press', $chartData['exercise_volume']['labels'][0]);
+        $this->assertCount(1, $chartData['type_volume_history']['labels']);
     }
 
     public function test_editing_exercise_does_not_change_historical_workout_configuration(): void

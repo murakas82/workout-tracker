@@ -7,6 +7,7 @@ use App\Models\WorkoutExercise;
 use App\Models\WorkoutSet;
 use App\Models\WorkoutType;
 use App\Services\ProgressionService;
+use App\Services\WorkoutStatsService;
 use App\Services\WorkoutRotationService;
 use App\Services\WorkoutSessionService;
 use Illuminate\Http\RedirectResponse;
@@ -236,44 +237,17 @@ class WorkoutController extends Controller
             ->with('status', 'Exercise updated.');
     }
 
-    public function summary(Request $request, Workout $workout, ProgressionService $progression): View
+    public function summary(Request $request, Workout $workout, WorkoutStatsService $workoutStats): View
     {
         $this->authorizeWorkout($request, $workout);
 
         $workout->load('workoutType', 'exercises.sets');
 
-        $stats = [
-            'exercises_completed' => $workout->exercises->whereNotNull('completed_at')->count(),
-            'working_sets_completed' => $workout->exercises->sum(
-                fn (WorkoutExercise $exercise) => $exercise->sets->where('set_type', WorkoutSet::TYPE_WORKING)->count(),
-            ),
-            'weight_increased' => 0,
-            'reps_improved' => 0,
-            'targets_reached' => $workout->exercises->where('progression_result', ProgressionService::RESULT_INCREASE)->count(),
-        ];
-
-        foreach ($workout->exercises as $exercise) {
-            $previous = $this->previousExercise($request, $exercise, $workout);
-
-            if (! $previous) {
-                continue;
-            }
-
-            $currentWeight = $progression->primaryWeight($exercise->sets);
-            $previousWeight = $progression->primaryWeight($previous->sets);
-            $currentReps = $exercise->sets->where('set_type', WorkoutSet::TYPE_WORKING)->sum('reps');
-            $previousReps = $previous->sets->where('set_type', WorkoutSet::TYPE_WORKING)->sum('reps');
-
-            if ($currentWeight !== null && $previousWeight !== null && $currentWeight > $previousWeight) {
-                $stats['weight_increased']++;
-            }
-
-            if ($currentReps > $previousReps) {
-                $stats['reps_improved']++;
-            }
-        }
-
-        return view('workouts.summary', compact('workout', 'stats'));
+        return view('workouts.summary', [
+            'workout' => $workout,
+            'stats' => $workoutStats->forWorkout($workout),
+            'chartData' => $workoutStats->chartData($workout),
+        ]);
     }
 
     public function cancel(Request $request, Workout $workout, WorkoutSessionService $sessions): RedirectResponse
