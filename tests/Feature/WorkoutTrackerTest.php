@@ -82,32 +82,50 @@ class WorkoutTrackerTest extends TestCase
         $this->assertSame('legs', app(WorkoutRotationService::class)->nextFor($user)->code);
     }
 
-    public function test_eight_eight_eight_on_six_to_eight_triggers_progression(): void
+    public function test_first_set_at_max_and_last_set_at_min_triggers_progression(): void
     {
-        $exercise = $this->progressionExercise(min: 6, max: 8, reps: [8, 8, 8]);
+        $exercise = $this->progressionExercise(min: 6, max: 8, reps: [8, 7, 6]);
 
         $this->assertSame(ProgressionService::RESULT_INCREASE, app(ProgressionService::class)->evaluate($exercise));
     }
 
-    public function test_eight_eight_seven_on_six_to_eight_does_not_trigger_progression(): void
+    public function test_first_set_below_max_does_not_trigger_progression(): void
     {
-        $exercise = $this->progressionExercise(min: 6, max: 8, reps: [8, 8, 7]);
+        $exercise = $this->progressionExercise(min: 6, max: 8, reps: [7, 8, 8]);
 
         $this->assertSame(ProgressionService::RESULT_KEEP, app(ProgressionService::class)->evaluate($exercise));
     }
 
-    public function test_twelve_twelve_twelve_on_eight_to_twelve_triggers_progression(): void
+    public function test_last_set_below_min_does_not_trigger_progression(): void
     {
-        $exercise = $this->progressionExercise(min: 8, max: 12, reps: [12, 12, 12]);
+        $exercise = $this->progressionExercise(min: 6, max: 8, reps: [8, 8, 5]);
+
+        $this->assertSame(ProgressionService::RESULT_KEEP, app(ProgressionService::class)->evaluate($exercise));
+    }
+
+    public function test_twelve_eight_eight_on_eight_to_twelve_triggers_progression(): void
+    {
+        $exercise = $this->progressionExercise(min: 8, max: 12, reps: [12, 10, 8]);
 
         $this->assertSame(ProgressionService::RESULT_INCREASE, app(ProgressionService::class)->evaluate($exercise));
     }
 
     public function test_drop_sets_do_not_affect_progression(): void
     {
-        $exercise = $this->progressionExercise(min: 6, max: 8, reps: [8, 8, 7], drops: [[50, 20]]);
+        $exercise = $this->progressionExercise(min: 6, max: 8, reps: [8, 8, 5], drops: [[50, 20]]);
 
         $this->assertSame(ProgressionService::RESULT_KEEP, app(ProgressionService::class)->evaluate($exercise));
+    }
+
+    public function test_unilateral_progression_requires_both_sides_to_reach_the_rule(): void
+    {
+        $exercise = $this->progressionExercise(min: 6, max: 8, reps: [8, 7, 6], rightReps: [8, 7, 5]);
+
+        $this->assertSame(ProgressionService::RESULT_KEEP, app(ProgressionService::class)->evaluate($exercise));
+
+        $exercise = $this->progressionExercise(min: 6, max: 8, reps: [8, 7, 6], rightReps: [8, 7, 6]);
+
+        $this->assertSame(ProgressionService::RESULT_INCREASE, app(ProgressionService::class)->evaluate($exercise));
     }
 
     public function test_exercise_data_is_saved_when_pressing_done_next_exercise(): void
@@ -417,8 +435,9 @@ class WorkoutTrackerTest extends TestCase
     /**
      * @param  list<int>  $reps
      * @param  list<array{0:int,1:int}>  $drops
+     * @param  list<int>|null  $rightReps
      */
-    private function progressionExercise(int $min, int $max, array $reps, array $drops = []): WorkoutExercise
+    private function progressionExercise(int $min, int $max, array $reps, array $drops = [], ?array $rightReps = null): WorkoutExercise
     {
         $user = User::factory()->create();
         $workout = Workout::query()->create([
@@ -437,17 +456,24 @@ class WorkoutTrackerTest extends TestCase
             'working_sets' => 3,
             'min_reps' => $min,
             'max_reps' => $max,
-            'unilateral' => false,
+            'unilateral' => $rightReps !== null,
         ]);
 
-        foreach ($reps as $index => $repCount) {
-            WorkoutSet::query()->create([
-                'workout_exercise_id' => $exercise->id,
-                'set_number' => $index + 1,
-                'weight' => 70,
-                'reps' => $repCount,
-                'set_type' => WorkoutSet::TYPE_WORKING,
-            ]);
+        $sides = $rightReps === null
+            ? [[null, $reps]]
+            : [[WorkoutSet::SIDE_LEFT, $reps], [WorkoutSet::SIDE_RIGHT, $rightReps]];
+
+        foreach ($sides as [$side, $sideReps]) {
+            foreach ($sideReps as $index => $repCount) {
+                WorkoutSet::query()->create([
+                    'workout_exercise_id' => $exercise->id,
+                    'set_number' => $index + 1,
+                    'side' => $side,
+                    'weight' => 70,
+                    'reps' => $repCount,
+                    'set_type' => WorkoutSet::TYPE_WORKING,
+                ]);
+            }
         }
 
         foreach ($drops as $index => [$weight, $repCount]) {

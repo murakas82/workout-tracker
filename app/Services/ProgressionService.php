@@ -24,7 +24,7 @@ class ProgressionService
             foreach ([WorkoutSet::SIDE_LEFT, WorkoutSet::SIDE_RIGHT] as $side) {
                 $sideSets = $workingSets->where('side', $side);
 
-                if (! $this->sideReachedTarget($sideSets, $exercise->working_sets, $exercise->max_reps)) {
+                if (! $this->sideReachedProgression($sideSets, $exercise->working_sets, $exercise->min_reps, $exercise->max_reps)) {
                     return $this->isComplete($workingSets, $exercise) ? self::RESULT_KEEP : self::RESULT_INCOMPLETE;
                 }
             }
@@ -32,7 +32,7 @@ class ProgressionService
             return self::RESULT_INCREASE;
         }
 
-        if (! $this->sideReachedTarget($workingSets, $exercise->working_sets, $exercise->max_reps)) {
+        if (! $this->sideReachedProgression($workingSets, $exercise->working_sets, $exercise->min_reps, $exercise->max_reps)) {
             return $this->isComplete($workingSets, $exercise) ? self::RESULT_KEEP : self::RESULT_INCOMPLETE;
         }
 
@@ -110,10 +110,20 @@ class ProgressionService
         return rtrim(rtrim(number_format((float) $weight, 2), '0'), '.');
     }
 
-    private function sideReachedTarget(Collection $sets, int $expectedSets, int $maxReps): bool
+    private function sideReachedProgression(Collection $sets, int $expectedSets, int $minReps, int $maxReps): bool
     {
-        return $sets->count() >= $expectedSets
-            && $sets->take($expectedSets)->every(fn (WorkoutSet $set) => $set->reps >= $maxReps);
+        if ($sets->count() < $expectedSets) {
+            return false;
+        }
+
+        $orderedSets = $sets->sortBy('set_number')->take($expectedSets)->values();
+        $firstSet = $orderedSets->first();
+        $lastSet = $orderedSets->last();
+
+        return $firstSet !== null
+            && $lastSet !== null
+            && $firstSet->reps >= $maxReps
+            && $lastSet->reps >= $minReps;
     }
 
     private function isComplete(Collection $workingSets, WorkoutExercise $exercise): bool
