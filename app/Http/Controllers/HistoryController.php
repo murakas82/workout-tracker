@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Workout;
 use App\Services\WorkoutStatsService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\View\View;
 
 class HistoryController extends Controller
@@ -21,9 +22,9 @@ class HistoryController extends Controller
         return view('history.index', compact('workouts'));
     }
 
-    public function show(Request $request, Workout $workout, WorkoutStatsService $workoutStats): View
+    public function show(Workout $workout, WorkoutStatsService $workoutStats): View
     {
-        abort_unless($workout->user_id === $request->user()->id, 404);
+        Gate::authorize('viewCompleted', $workout);
 
         $workout->load('workoutType', 'exercises.sets');
 

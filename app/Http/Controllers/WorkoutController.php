@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\WorkoutExerciseSetsRequest;
 use App\Models\Workout;
 use App\Models\WorkoutExercise;
 use App\Models\WorkoutSet;
@@ -13,7 +14,7 @@ use App\Services\WorkoutSessionService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Validation\ValidationException;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\View\View;
 
 class WorkoutController extends Controller
@@ -51,7 +52,7 @@ class WorkoutController extends Controller
 
     public function show(Request $request, Workout $workout, ?int $position = null): View|RedirectResponse
     {
-        $this->authorizeWorkout($request, $workout);
+        Gate::authorize('view', $workout);
 
         if ($workout->isCompleted()) {
             return redirect()->route('workouts.summary', $workout);
@@ -73,9 +74,9 @@ class WorkoutController extends Controller
         ]);
     }
 
-    public function reorder(Request $request, Workout $workout): View
+    public function reorder(Workout $workout): View
     {
-        $this->authorizeActiveWorkout($request, $workout);
+        Gate::authorize('viewActive', $workout);
 
         $workout->load('workoutType', 'exercises');
 
@@ -84,7 +85,7 @@ class WorkoutController extends Controller
 
     public function moveExercise(Request $request, Workout $workout, WorkoutExercise $workoutExercise): RedirectResponse
     {
-        $this->authorizeActiveWorkout($request, $workout);
+        Gate::authorize('viewActive', $workout);
         abort_unless($workoutExercise->workout_id === $workout->id, 404);
 
         $validated = $request->validate([
@@ -130,7 +131,7 @@ class WorkoutController extends Controller
 
     public function moveExerciseLater(Request $request, Workout $workout, WorkoutExercise $workoutExercise): RedirectResponse
     {
-        $this->authorizeActiveWorkout($request, $workout);
+        Gate::authorize('viewActive', $workout);
         abort_unless($workoutExercise->workout_id === $workout->id, 404);
 
         $nextPosition = null;
@@ -173,16 +174,15 @@ class WorkoutController extends Controller
     }
 
     public function saveExercise(
-        Request $request,
+        WorkoutExerciseSetsRequest $request,
         Workout $workout,
         WorkoutExercise $workoutExercise,
         WorkoutSessionService $sessions,
     ): RedirectResponse {
-        $this->authorizeWorkout($request, $workout);
+        Gate::authorize('viewActive', $workout);
         abort_unless($workoutExercise->workout_id === $workout->id, 404);
-        abort_unless($workout->status === Workout::STATUS_IN_PROGRESS, 404);
 
-        $sets = $this->extractSets($request, $workoutExercise);
+        $sets = $request->workoutSets($workoutExercise);
         $sessions->saveExercise($workoutExercise, $sets);
 
         $next = $workout->exercises()
@@ -199,9 +199,9 @@ class WorkoutController extends Controller
         return redirect()->route('workouts.exercise', [$workout, $next->position]);
     }
 
-    public function editCompletedExercise(Request $request, Workout $workout, WorkoutExercise $workoutExercise): View
+    public function editCompletedExercise(Workout $workout, WorkoutExercise $workoutExercise): View
     {
-        $this->authorizeCompletedWorkout($request, $workout);
+        Gate::authorize('viewCompleted', $workout);
         abort_unless($workoutExercise->workout_id === $workout->id, 404);
 
         $workout->load('workoutType');
@@ -214,15 +214,15 @@ class WorkoutController extends Controller
     }
 
     public function updateCompletedExercise(
-        Request $request,
+        WorkoutExerciseSetsRequest $request,
         Workout $workout,
         WorkoutExercise $workoutExercise,
         ProgressionService $progression,
     ): RedirectResponse {
-        $this->authorizeCompletedWorkout($request, $workout);
+        Gate::authorize('viewCompleted', $workout);
         abort_unless($workoutExercise->workout_id === $workout->id, 404);
 
-        $sets = $this->extractSets($request, $workoutExercise);
+        $sets = $request->workoutSets($workoutExercise);
 
         DB::transaction(function () use ($workoutExercise, $sets, $progression): void {
             $this->replaceExerciseSets($workoutExercise, $sets);
@@ -237,9 +237,9 @@ class WorkoutController extends Controller
             ->with('status', 'Exercise updated.');
     }
 
-    public function summary(Request $request, Workout $workout, WorkoutStatsService $workoutStats): View
+    public function summary(Workout $workout, WorkoutStatsService $workoutStats): View
     {
-        $this->authorizeWorkout($request, $workout);
+        Gate::authorize('viewCompleted', $workout);
 
         $workout->load('workoutType', 'exercises.sets');
 
@@ -250,31 +250,13 @@ class WorkoutController extends Controller
         ]);
     }
 
-    public function cancel(Request $request, Workout $workout, WorkoutSessionService $sessions): RedirectResponse
+    public function cancel(Workout $workout, WorkoutSessionService $sessions): RedirectResponse
     {
-        $this->authorizeWorkout($request, $workout);
-        abort_unless($workout->status === Workout::STATUS_IN_PROGRESS, 404);
+        Gate::authorize('viewActive', $workout);
 
         $sessions->cancel($workout);
 
         return redirect()->route('dashboard')->with('status', 'Workout cancelled.');
-    }
-
-    private function authorizeWorkout(Request $request, Workout $workout): void
-    {
-        abort_unless($workout->user_id === $request->user()->id, 404);
-    }
-
-    private function authorizeActiveWorkout(Request $request, Workout $workout): void
-    {
-        $this->authorizeWorkout($request, $workout);
-        abort_unless($workout->status === Workout::STATUS_IN_PROGRESS, 404);
-    }
-
-    private function authorizeCompletedWorkout(Request $request, Workout $workout): void
-    {
-        $this->authorizeWorkout($request, $workout);
-        abort_unless($workout->status === Workout::STATUS_COMPLETED, 404);
     }
 
     private function previousExercise(Request $request, WorkoutExercise $exercise, Workout $workout): ?WorkoutExercise
@@ -298,86 +280,6 @@ class WorkoutController extends Controller
     }
 
     /**
-     * @return list<array{set_number:int,side:?string,weight:float,reps:int,set_type:string}>
-     */
-    private function extractSets(Request $request, WorkoutExercise $exercise): array
-    {
-        $errors = [];
-        $sets = [];
-        $working = $request->input('working', []);
-        $sides = $exercise->unilateral ? [WorkoutSet::SIDE_LEFT, WorkoutSet::SIDE_RIGHT] : [null];
-
-        foreach ($sides as $side) {
-            for ($setNumber = 1; $setNumber <= $exercise->working_sets; $setNumber++) {
-                $row = $side === null
-                    ? data_get($working, (string) $setNumber, [])
-                    : data_get($working, $side.'.'.$setNumber, []);
-
-                $weightValue = $this->normalizeWeight($row['weight'] ?? null);
-                $reps = $row['reps'] ?? null;
-                $label = $side ? ucfirst($side).' set '.$setNumber : 'Set '.$setNumber;
-
-                if ($weightValue === null) {
-                    $errors['working'] = $label.' needs a valid weight.';
-                }
-
-                if (! ctype_digit((string) $reps) || (int) $reps < 1) {
-                    $errors['working'] = $label.' needs valid reps.';
-                }
-
-                if (! $errors) {
-                    $sets[] = [
-                        'set_number' => $setNumber,
-                        'side' => $side,
-                        'weight' => $weightValue,
-                        'reps' => (int) $reps,
-                        'set_type' => WorkoutSet::TYPE_WORKING,
-                    ];
-                }
-            }
-        }
-
-        $dropRows = $request->input('drops', []);
-        $dropNumber = 1;
-
-        foreach ($dropRows as $row) {
-            $weight = $row['weight'] ?? null;
-            $reps = $row['reps'] ?? null;
-            $side = $exercise->unilateral ? ($row['side'] ?? null) : null;
-
-            if ($this->isBlankInput($weight) && $this->isBlankInput($reps) && $this->isBlankInput($side)) {
-                continue;
-            }
-
-            $weightValue = $this->normalizeWeight($weight);
-
-            if ($weightValue === null || ! ctype_digit((string) $reps) || (int) $reps < 1) {
-                $errors['drops'] = 'Drop sets need valid weight and reps.';
-                continue;
-            }
-
-            if ($exercise->unilateral && ! in_array($side, [WorkoutSet::SIDE_LEFT, WorkoutSet::SIDE_RIGHT], true)) {
-                $errors['drops'] = 'Choose left or right for each drop set.';
-                continue;
-            }
-
-            $sets[] = [
-                'set_number' => $dropNumber++,
-                'side' => $side,
-                'weight' => $weightValue,
-                'reps' => (int) $reps,
-                'set_type' => WorkoutSet::TYPE_DROP,
-            ];
-        }
-
-        if ($errors) {
-            throw ValidationException::withMessages($errors);
-        }
-
-        return $sets;
-    }
-
-    /**
      * @param  list<array{set_number:int,side:?string,weight:float,reps:int,set_type:string}>  $sets
      */
     private function replaceExerciseSets(WorkoutExercise $exercise, array $sets): void
@@ -394,29 +296,5 @@ class WorkoutController extends Controller
                 'set_type' => $set['set_type'],
             ]);
         }
-    }
-
-    private function normalizeWeight(mixed $weight): ?float
-    {
-        if ($this->isBlankInput($weight)) {
-            return null;
-        }
-
-        if (is_string($weight)) {
-            $weight = str_replace(',', '.', trim($weight));
-        }
-
-        if (! is_numeric($weight)) {
-            return null;
-        }
-
-        $weight = (float) $weight;
-
-        return $weight >= 0 ? $weight : null;
-    }
-
-    private function isBlankInput(mixed $value): bool
-    {
-        return $value === null || (is_string($value) && trim($value) === '');
     }
 }

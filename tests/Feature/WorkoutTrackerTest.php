@@ -208,6 +208,30 @@ class WorkoutTrackerTest extends TestCase
             ->assertSee('Exercise 2 of 7');
     }
 
+    public function test_active_workout_cannot_be_viewed_as_completed_history(): void
+    {
+        $user = User::factory()->create();
+        $workout = app(WorkoutSessionService::class)->start($user, WorkoutType::query()->where('code', 'push')->first());
+
+        $this->actingAs($user)
+            ->get(route('history.show', $workout))
+            ->assertNotFound();
+
+        $this->actingAs($user)
+            ->get(route('workouts.summary', $workout))
+            ->assertNotFound();
+    }
+
+    public function test_completed_workout_cannot_be_changed_as_active_workout(): void
+    {
+        $user = User::factory()->create();
+        $workout = $this->completeWorkout($user, 'push');
+
+        $this->actingAs($user)
+            ->delete(route('workouts.cancel', $workout))
+            ->assertNotFound();
+    }
+
     public function test_unfinished_exercises_can_be_reordered_during_active_workout(): void
     {
         $user = User::factory()->create();
