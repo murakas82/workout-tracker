@@ -27,7 +27,5 @@
 
             <button class="button-primary" type="submit">Log in</button>
         </form>
-
-        <a href="{{ route('register') }}" class="button-secondary w-full">Create account</a>
     </section>
 @endsection
