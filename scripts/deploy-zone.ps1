@@ -366,7 +366,7 @@ if [ -z "$EXISTING_KEY" ]; then
     php artisan key:generate --force --ansi
 fi
 
-php artisan migrate --force --seed --ansi
+php artisan migrate --force --ansi
 php artisan config:cache --ansi
 php artisan route:cache --ansi
 php artisan view:cache --ansi
