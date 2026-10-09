@@ -8,9 +8,9 @@ use App\Models\WorkoutExercise;
 use App\Models\WorkoutSet;
 use App\Models\WorkoutType;
 use App\Services\ProgressionService;
-use App\Services\WorkoutStatsService;
 use App\Services\WorkoutRotationService;
 use App\Services\WorkoutSessionService;
+use App\Services\WorkoutStatsService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -35,19 +35,14 @@ class WorkoutController extends Controller
 
     public function start(Request $request, WorkoutType $workoutType, WorkoutSessionService $sessions): RedirectResponse
     {
-        $inProgress = Workout::query()
-            ->where('user_id', $request->user()->id)
-            ->where('status', Workout::STATUS_IN_PROGRESS)
-            ->latest('updated_at')
-            ->first();
+        $workout = $sessions->start($request->user(), $workoutType);
+        $response = redirect()->route('workouts.show', $workout);
 
-        if ($inProgress) {
-            return redirect()->route('workouts.show', $inProgress)->with('status', 'Continue or cancel the workout already in progress.');
+        if (! $workout->wasRecentlyCreated) {
+            $response->with('status', 'Continue or cancel the workout already in progress.');
         }
 
-        $workout = $sessions->start($request->user(), $workoutType);
-
-        return redirect()->route('workouts.show', $workout);
+        return $response;
     }
 
     public function show(Request $request, Workout $workout, ?int $position = null): View|RedirectResponse
