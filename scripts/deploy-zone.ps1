@@ -64,6 +64,11 @@ function Write-Step {
     Write-Host "==> $Message" -ForegroundColor Cyan
 }
 
+function Invoke-DeploymentPreflight {
+    Write-Step "Checking deployment data protection"
+    & (Join-Path $PSScriptRoot "check-deploy-data-protection.ps1")
+}
+
 function Resolve-DeploySetting {
     param(
         [Parameter(Mandatory = $true)][string] $Name,
@@ -336,6 +341,7 @@ DB_DATABASE=$APP/database/database.sqlite
 SESSION_DRIVER=database
 SESSION_LIFETIME=120
 SESSION_ENCRYPT=false
+SESSION_SECURE_COOKIE=true
 SESSION_PATH=$SESSION_PATH
 SESSION_DOMAIN=null
 BROADCAST_CONNECTION=log
@@ -462,6 +468,7 @@ function Invoke-FinalVerification {
     Invoke-External -FilePath "curl.exe" -Arguments @("-I", "--max-time", "20", $script:PublicUrl)
 }
 
+Invoke-DeploymentPreflight
 Resolve-Settings
 Assert-RepoReady
 Invoke-OptionalLocalChecks

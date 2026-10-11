@@ -49,6 +49,8 @@ class WorkoutController extends Controller
     {
         Gate::authorize('view', $workout);
 
+        abort_if($workout->status === Workout::STATUS_CANCELLED, 404);
+
         if ($workout->isCompleted()) {
             return redirect()->route('workouts.summary', $workout);
         }
@@ -178,16 +180,22 @@ class WorkoutController extends Controller
         abort_unless($workoutExercise->workout_id === $workout->id, 404);
 
         $sets = $request->workoutSets($workoutExercise);
-        $sessions->saveExercise($workoutExercise, $sets);
+        $next = DB::transaction(function () use ($workout, $workoutExercise, $sets, $sessions): ?WorkoutExercise {
+            $sessions->saveExercise($workoutExercise, $sets);
 
-        $next = $workout->exercises()
-            ->whereNull('completed_at')
-            ->orderBy('position')
-            ->first();
+            $next = $workout->exercises()
+                ->whereNull('completed_at')
+                ->orderBy('position')
+                ->first();
+
+            if (! $next) {
+                $sessions->finish($workout);
+            }
+
+            return $next;
+        });
 
         if (! $next) {
-            $sessions->finish($workout);
-
             return redirect()->route('workouts.summary', $workout);
         }
 

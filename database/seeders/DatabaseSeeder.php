@@ -8,6 +8,7 @@ use App\Models\WorkoutTemplateExercise;
 use App\Models\WorkoutType;
 use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
+use Illuminate\Support\Facades\DB;
 
 class DatabaseSeeder extends Seeder
 {
@@ -57,44 +58,50 @@ class DatabaseSeeder extends Seeder
             ],
         ];
 
-        foreach ($workouts as $code => $data) {
-            $type = WorkoutType::query()->updateOrCreate(
-                ['code' => $code],
-                ['name' => $data['name'], 'sort_order' => $data['order']],
-            );
-
-            $template = WorkoutTemplate::query()->updateOrCreate(
-                ['workout_type_id' => $type->id, 'name' => $data['name'].' Template'],
-                ['active' => true],
-            );
-
-            WorkoutTemplateExercise::query()->where('workout_template_id', $template->id)->delete();
-
-            foreach ($data['exercises'] as $index => $exerciseData) {
-                [$name, $group, $sets, $minReps, $maxReps, $restMin, $restMax, $unilateral] = $exerciseData;
-
-                $exercise = Exercise::query()->updateOrCreate(
-                    ['workout_type_id' => $type->id, 'name' => $name],
-                    [
-                        'muscle_group' => $group,
-                        'sort_order' => $index + 1,
-                        'working_sets' => $sets,
-                        'min_reps' => $minReps,
-                        'max_reps' => $maxReps,
-                        'rest_min_seconds' => $restMin,
-                        'rest_max_seconds' => $restMax,
-                        'unilateral' => $unilateral,
-                        'active' => true,
-                        'archived_at' => null,
-                    ],
+        DB::transaction(function () use ($workouts): void {
+            foreach ($workouts as $code => $data) {
+                $type = WorkoutType::query()->firstOrCreate(
+                    ['code' => $code],
+                    ['name' => $data['name'], 'sort_order' => $data['order']],
                 );
 
-                WorkoutTemplateExercise::query()->create([
-                    'workout_template_id' => $template->id,
-                    'exercise_id' => $exercise->id,
-                    'position' => $index + 1,
-                ]);
+                $template = WorkoutTemplate::query()->firstOrCreate(
+                    ['workout_type_id' => $type->id],
+                    ['name' => $data['name'].' Template', 'active' => true],
+                );
+
+                // A renamed, disabled, reordered, or empty template is intentional.
+                // Only populate a template when it is first created.
+                if (! $template->wasRecentlyCreated) {
+                    continue;
+                }
+
+                foreach ($data['exercises'] as $index => $exerciseData) {
+                    [$name, $group, $sets, $minReps, $maxReps, $restMin, $restMax, $unilateral] = $exerciseData;
+
+                    $exercise = Exercise::query()->firstOrCreate(
+                        ['workout_type_id' => $type->id, 'name' => $name],
+                        [
+                            'muscle_group' => $group,
+                            'sort_order' => $index + 1,
+                            'working_sets' => $sets,
+                            'min_reps' => $minReps,
+                            'max_reps' => $maxReps,
+                            'rest_min_seconds' => $restMin,
+                            'rest_max_seconds' => $restMax,
+                            'unilateral' => $unilateral,
+                            'active' => true,
+                            'archived_at' => null,
+                        ],
+                    );
+
+                    WorkoutTemplateExercise::query()->create([
+                        'workout_template_id' => $template->id,
+                        'exercise_id' => $exercise->id,
+                        'position' => $index + 1,
+                    ]);
+                }
             }
-        }
+        });
     }
 }

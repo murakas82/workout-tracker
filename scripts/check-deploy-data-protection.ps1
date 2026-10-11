@@ -27,7 +27,7 @@ $migrations = [regex]::Matches($bash, '(?m)^php artisan migrate[^\r\n]*')
 if ($migrations.Count -ne 1 -or $migrations[0].Value -ne 'php artisan migrate --force --ansi') {
     throw "Production must use exactly: php artisan migrate --force --ansi"
 }
-if ($bash -match '(?m)^\s*php artisan .*?(?:--seed\b|\bdb:seed\b|\bmigrate:(?:fresh|refresh|reset)\b)') {
+if ($bash -match '(?m)^\s*php artisan .*?(?:--seed\b|\bdb:(?:seed|wipe)\b|\bmigrate:(?:fresh|refresh|reset|rollback)\b)') {
     throw "Production deployment must not seed or reset the database."
 }
 
@@ -47,4 +47,34 @@ foreach ($required in @(
     }
 }
 
-Write-Host "PASS: deployment syntax, migration flags, and SQLite backup protection."
+$secureCookies = [regex]::Matches($bash, '(?m)^SESSION_SECURE_COOKIE=[^\r\n]*')
+if ($secureCookies.Count -ne 1 -or $secureCookies[0].Value -ne 'SESSION_SECURE_COOKIE=true') {
+    throw "Production must enable secure session cookies."
+}
+
+$preflightFunction = $ast.Find({
+    param($node)
+    $node -is [System.Management.Automation.Language.FunctionDefinitionAst] -and
+    $node.Name -eq 'Invoke-DeploymentPreflight'
+}, $true)
+if ($null -eq $preflightFunction -or
+    $preflightFunction.Body.EndBlock.Statements.Count -ne 2 -or
+    $preflightFunction.Body.EndBlock.Statements[0].Extent.Text.Trim() -ne
+        'Write-Step "Checking deployment data protection"' -or
+    $preflightFunction.Body.EndBlock.Statements[-1].Extent.Text.Trim() -ne
+        '& (Join-Path $PSScriptRoot "check-deploy-data-protection.ps1")') {
+    throw "Deployment preflight must execute the data protection check unconditionally."
+}
+
+$calls = @($ast.EndBlock.Statements | Where-Object {
+    $_ -is [System.Management.Automation.Language.PipelineAst] -and
+    $_.PipelineElements[0] -is [System.Management.Automation.Language.CommandAst]
+})
+$preflightCalls = @($calls | Where-Object { $_.PipelineElements[0].GetCommandName() -eq 'Invoke-DeploymentPreflight' })
+$deploymentCalls = @($calls | Where-Object { $_.PipelineElements[0].GetCommandName() -in @('Push-Code', 'Invoke-RemoteDeploy', 'Invoke-FinalVerification') })
+if ($preflightCalls.Count -ne 1 -or $deploymentCalls.Count -eq 0 -or
+    @($deploymentCalls | Where-Object { $_.Extent.StartOffset -lt $preflightCalls[0].Extent.StartOffset }).Count -gt 0) {
+    throw "Mandatory local preflight must run before Git push or SSH deployment."
+}
+
+Write-Host "PASS: deployment syntax, mandatory preflight, secure cookies, migration flags, and SQLite backup protection."
