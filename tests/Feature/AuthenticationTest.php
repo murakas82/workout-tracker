@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Route;
 use Tests\TestCase;
 
 class AuthenticationTest extends TestCase
@@ -21,6 +22,7 @@ class AuthenticationTest extends TestCase
     {
         $user = User::factory()->create();
 
+        $this->assertFalse(Route::has('register'));
         $this->get('/register')->assertNotFound();
         $this->post('/register', [
             'name' => 'New user',

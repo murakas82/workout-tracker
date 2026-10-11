@@ -44,19 +44,25 @@ try {
     $script:Passed++
 
     $cases = @(
-        @{ Name = 'migration-seed'; Source = $source.Replace('php artisan migrate --force --ansi', 'php artisan migrate --force --seed --ansi'); Error = 'Production must use exactly' },
+        @{ Name = 'migration-seed'; Source = $source.Replace('php artisan migrate --force --ansi', 'php artisan migrate --force --seed --ansi'); Error = 'must not seed or reset' },
+        @{ Name = 'spaced-migration-seed'; Source = $source.Replace('php artisan migrate --force --ansi', '  php   artisan    migrate --force --seed --ansi'); Error = 'must not seed or reset' },
+        @{ Name = 'migration-not-forced'; Source = $source.Replace('php artisan migrate --force --ansi', 'php artisan migrate --ansi'); Error = 'non-interactive migrations' },
         @{ Name = 'separate-seed'; Source = $source.Replace('php artisan view:cache --ansi', "php artisan view:cache --ansi`nphp artisan db:seed --force"); Error = 'must not seed or reset' },
         @{ Name = 'database-wipe'; Source = $source.Replace('php artisan view:cache --ansi', "php artisan view:cache --ansi`nphp artisan db:wipe --force"); Error = 'must not seed or reset' },
         @{ Name = 'backup-missing'; Source = $source.Replace("`nbackup_database`n", "`n# backup omitted`n"); Error = 'backup must run before migrations' },
+        @{ Name = 'backup-too-late'; Source = $source.Replace("`nbackup_database`n", "`n").Replace('php artisan migrate --force --ansi', "php artisan migrate --force --ansi`nbackup_database"); Error = 'backup must run before migrations' },
         @{ Name = 'secure-cookie-disabled'; Source = $source.Replace('SESSION_SECURE_COOKIE=true', 'SESSION_SECURE_COOKIE=false'); Error = 'enable secure session cookies' },
         @{ Name = 'preflight-missing'; Source = $source.Replace("`nInvoke-DeploymentPreflight`n", "`n# preflight omitted`n"); Error = 'preflight must run before' },
         @{ Name = 'preflight-too-late'; Source = $source.Replace("`nInvoke-DeploymentPreflight`n", "`n").Replace("`nPush-Code`n", "`nPush-Code`nInvoke-DeploymentPreflight`n"); Error = 'preflight must run before' },
+        @{ Name = 'conditional-push-before-check'; Source = $source.Replace("`nInvoke-DeploymentPreflight`n", "`nif (`$true) { Push-Code }`nInvoke-DeploymentPreflight`n"); Error = 'preflight must run before' },
+        @{ Name = 'preflight-conditional'; Source = $source.Replace("`nInvoke-DeploymentPreflight`n", "`nif (`$DryRun) { Invoke-DeploymentPreflight }`n"); Error = 'preflight must run before' },
+        @{ Name = 'checker-conditional'; Source = $source.Replace('& (Join-Path $PSScriptRoot "check-deploy-data-protection.ps1")', 'if ($DryRun) { & (Join-Path $PSScriptRoot "check-deploy-data-protection.ps1") }'); Error = 'check unconditionally' },
         @{ Name = 'dry-run-bypass'; Source = $source.Replace('function Invoke-DeploymentPreflight {', "function Invoke-DeploymentPreflight {`n    if (`$DryRun) { return }"); Error = 'check unconditionally' },
         @{ Name = 'early-return'; Source = $source.Replace('Write-Step "Checking deployment data protection"', 'return'); Error = 'check unconditionally' },
         @{ Name = 'syntax-error'; Source = $source + "`nif (`n"; Error = 'syntax errors' }
     )
     foreach ($command in @('migrate:fresh', 'migrate:refresh', 'migrate:reset', 'migrate:rollback')) {
-        $cases += @{ Name = $command.Replace(':', '-'); Source = $source.Replace('php artisan view:cache --ansi', "php artisan view:cache --ansi`nphp artisan $command --force"); Error = 'Production must use exactly' }
+        $cases += @{ Name = $command.Replace(':', '-'); Source = $source.Replace('php artisan view:cache --ansi', "php artisan view:cache --ansi`nphp artisan $command --force"); Error = 'must not seed or reset' }
     }
 
     foreach ($case in $cases) {
@@ -66,6 +72,23 @@ try {
         if ($result.ExitCode -eq 0 -or $result.Output -notmatch $case.Error) {
             throw "Fixture '$($case.Name)' was not rejected correctly: $($result.Output)"
         }
+        $script:Passed++
+    }
+
+    $safeVariations = @(
+        @{ Name = 'extra-logging'; Source = $source.Replace('function Invoke-DeploymentPreflight {', "function Invoke-DeploymentPreflight {`n    Write-Host 'Starting safety checks'") },
+        @{ Name = 'different-logging'; Source = $source.Replace('Write-Step "Checking deployment data protection"', "Write-Step 'Checking release safety'") },
+        @{ Name = 'multiline-single-quotes'; Source = $source.Replace('& (Join-Path $PSScriptRoot "check-deploy-data-protection.ps1")', "& (`n        Join-Path `$PSScriptRoot 'check-deploy-data-protection.ps1'`n    )") },
+        @{ Name = 'migration-spacing-and-order'; Source = $source.Replace('php artisan migrate --force --ansi', '  php   artisan    migrate --ansi --force  ') },
+        @{ Name = 'return-after-check'; Source = $source.Replace('& (Join-Path $PSScriptRoot "check-deploy-data-protection.ps1")', "& (Join-Path `$PSScriptRoot 'check-deploy-data-protection.ps1')`n    return") },
+        @{ Name = 'repeated-preflight'; Source = $source.Replace("`nInvoke-DeploymentPreflight`n", "`nInvoke-DeploymentPreflight`nInvoke-DeploymentPreflight`n") },
+        @{ Name = 'additional-safe-migration'; Source = $source.Replace('php artisan migrate --force --ansi', "php artisan migrate --force --ansi`nphp artisan migrate --force") }
+    )
+    foreach ($variation in $safeVariations) {
+        if ($variation.Source -ceq $source) { throw "Fixture '$($variation.Name)' did not change the source." }
+        $directory = New-CheckFixture -Name $variation.Name -DeploySource $variation.Source
+        $result = Invoke-FixtureScript -Path (Join-Path $directory 'check-deploy-data-protection.ps1')
+        if ($result.ExitCode -ne 0) { throw "Safe variation '$($variation.Name)' was rejected: $($result.Output)" }
         $script:Passed++
     }
 

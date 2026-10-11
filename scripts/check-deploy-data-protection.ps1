@@ -23,12 +23,13 @@ if ($null -eq $remoteScript) {
 }
 
 $bash = $remoteScript.Value
-$migrations = [regex]::Matches($bash, '(?m)^php artisan migrate[^\r\n]*')
-if ($migrations.Count -ne 1 -or $migrations[0].Value -ne 'php artisan migrate --force --ansi') {
-    throw "Production must use exactly: php artisan migrate --force --ansi"
-}
-if ($bash -match '(?m)^\s*php artisan .*?(?:--seed\b|\bdb:(?:seed|wipe)\b|\bmigrate:(?:fresh|refresh|reset|rollback)\b)') {
+if ($bash -match '(?m)^[ \t]*php\s+artisan\s+.*?(?:--seed\b|\bdb:(?:seed|wipe)\b|\bmigrate:(?:fresh|refresh|reset|rollback)\b)') {
     throw "Production deployment must not seed or reset the database."
+}
+$migrations = [regex]::Matches($bash, '(?m)^[ \t]*php\s+artisan\s+migrate(?=\s|$)(?<arguments>[^\r\n]*)')
+if ($migrations.Count -eq 0 -or
+    @($migrations | Where-Object { $_.Groups['arguments'].Value -notmatch '(?:^|\s)--force(?:\s|$)' }).Count -gt 0) {
+    throw "Production must run non-interactive migrations with --force."
 }
 
 $backup = [regex]::Match($bash, '(?m)^backup_database\s*$')
@@ -52,29 +53,54 @@ if ($secureCookies.Count -ne 1 -or $secureCookies[0].Value -ne 'SESSION_SECURE_C
     throw "Production must enable secure session cookies."
 }
 
-$preflightFunction = $ast.Find({
-    param($node)
-    $node -is [System.Management.Automation.Language.FunctionDefinitionAst] -and
-    $node.Name -eq 'Invoke-DeploymentPreflight'
-}, $true)
-if ($null -eq $preflightFunction -or
-    $preflightFunction.Body.EndBlock.Statements.Count -ne 2 -or
-    $preflightFunction.Body.EndBlock.Statements[0].Extent.Text.Trim() -ne
-        'Write-Step "Checking deployment data protection"' -or
-    $preflightFunction.Body.EndBlock.Statements[-1].Extent.Text.Trim() -ne
-        '& (Join-Path $PSScriptRoot "check-deploy-data-protection.ps1")') {
-    throw "Deployment preflight must execute the data protection check unconditionally."
+# Find unconditional commands by scope, without assuming a particular statement
+# layout, logging text, quote style, or number of statements in a function.
+function Get-ScopeCommands {
+    param(
+        [System.Management.Automation.Language.ScriptBlockAst] $Scope,
+        [switch] $IncludeConditional
+    )
+
+    $Scope.FindAll({ param($node) $node -is [System.Management.Automation.Language.CommandAst] }, $true) | Where-Object {
+        $parent = $_.Parent
+        while ($null -ne $parent -and $parent -ne $Scope) {
+            if ($parent -is [System.Management.Automation.Language.ScriptBlockAst] -or
+                $parent -is [System.Management.Automation.Language.CommandAst] -or
+                (-not $IncludeConditional -and $parent -is [System.Management.Automation.Language.StatementAst] -and
+                 $parent -isnot [System.Management.Automation.Language.PipelineBaseAst])) {
+                return $false
+            }
+            $parent = $parent.Parent
+        }
+        return $parent -eq $Scope
+    }
 }
 
-$calls = @($ast.EndBlock.Statements | Where-Object {
-    $_ -is [System.Management.Automation.Language.PipelineAst] -and
-    $_.PipelineElements[0] -is [System.Management.Automation.Language.CommandAst]
-})
-$preflightCalls = @($calls | Where-Object { $_.PipelineElements[0].GetCommandName() -eq 'Invoke-DeploymentPreflight' })
-$deploymentCalls = @($calls | Where-Object { $_.PipelineElements[0].GetCommandName() -in @('Push-Code', 'Invoke-RemoteDeploy', 'Invoke-FinalVerification') })
-if ($preflightCalls.Count -ne 1 -or $deploymentCalls.Count -eq 0 -or
-    @($deploymentCalls | Where-Object { $_.Extent.StartOffset -lt $preflightCalls[0].Extent.StartOffset }).Count -gt 0) {
+$calls = @(Get-ScopeCommands -Scope $ast)
+$preflightCall = $calls | Where-Object { $_.GetCommandName() -eq 'Invoke-DeploymentPreflight' } | Select-Object -First 1
+$deploymentCalls = @(Get-ScopeCommands -Scope $ast -IncludeConditional | Where-Object { $_.GetCommandName() -in @('Push-Code', 'Invoke-RemoteDeploy', 'Invoke-FinalVerification') })
+if ($null -eq $preflightCall -or $deploymentCalls.Count -eq 0 -or
+    @($deploymentCalls | Where-Object { $_.Extent.StartOffset -lt $preflightCall.Extent.StartOffset }).Count -gt 0) {
     throw "Mandatory local preflight must run before Git push or SSH deployment."
+}
+
+$preflightFunction = $ast.Find({
+    param($node)
+    $node -is [System.Management.Automation.Language.FunctionDefinitionAst] -and $node.Name -eq 'Invoke-DeploymentPreflight'
+}, $true)
+if ($null -eq $preflightFunction) { throw "Deployment preflight function was not found." }
+$checkerCall = Get-ScopeCommands -Scope $preflightFunction.Body | Where-Object {
+    $_.InvocationOperator -eq [System.Management.Automation.Language.TokenKind]::Ampersand -and
+    $_.Extent.Text -match '["'']check-deploy-data-protection\.ps1["'']'
+} | Select-Object -First 1
+$earlyExits = @($preflightFunction.Body.FindAll({
+    param($node)
+    $node -is [System.Management.Automation.Language.ReturnStatementAst] -or
+    $node -is [System.Management.Automation.Language.ExitStatementAst]
+}, $false))
+if ($null -eq $checkerCall -or
+    @($earlyExits | Where-Object { $_.Extent.StartOffset -lt $checkerCall.Extent.StartOffset }).Count -gt 0) {
+    throw "Deployment preflight must execute the data protection check unconditionally."
 }
 
 Write-Host "PASS: deployment syntax, mandatory preflight, secure cookies, migration flags, and SQLite backup protection."
