@@ -32,7 +32,7 @@ if ($migrations.Count -eq 0 -or
     throw "Production must run non-interactive migrations with --force."
 }
 
-$backup = [regex]::Match($bash, '(?m)^backup_database\s*$')
+$backup = [regex]::Match($bash, '(?m)^backup_database "\$PREDEPLOY_BACKUP"\s*$')
 if (-not $backup.Success -or $backup.Index -ge $migrations[0].Index) {
     throw "SQLite backup must run before migrations."
 }
@@ -40,7 +40,6 @@ foreach ($required in @(
     'backup_database() {',
     'if [ ! -s "$DB_FILE" ]; then',
     'sqlite3 "$DB_FILE" ".backup ''$BACKUP_FILE''"',
-    'command -v sqlite3 >/dev/null 2>&1 || fail "sqlite3 is required for a consistent SQLite backup."',
     'chmod 600 "$BACKUP_FILE"'
 )) {
     if (-not $bash.Contains($required)) {
@@ -56,7 +55,7 @@ $remotePreflight = [regex]::Match($bash, '(?ms)^remote_preflight\(\) \{\r?\n(?<b
 $remotePreflightCall = [regex]::Match($bash, '(?m)^remote_preflight[ \t]*\r?$')
 $firstRemoteWrite = [regex]::Match($bash, '(?m)^(?:mkdir -p "\$APP"|git (?:init|remote|fetch|symbolic-ref|reset)|cat > \.env)')
 if (-not $remotePreflight.Success -or
-    -not $remotePreflight.Groups['body'].Value.Contains('command -v sqlite3 >/dev/null 2>&1 || fail "sqlite3 is required for a consistent SQLite backup."') -or
+    $remotePreflight.Groups['body'].Value -notmatch '(?m)^\s*command\s+-v\s+sqlite3\b[^\r\n]*\|\|\s*fail\b' -or
     -not $remotePreflightCall.Success -or -not $firstRemoteWrite.Success -or
     $remotePreflightCall.Index -ge $firstRemoteWrite.Index) {
     throw "Remote preflight must check sqlite3 before modifying the application, environment, or repository."
@@ -64,6 +63,22 @@ if (-not $remotePreflight.Success -or
 
 if ($backup.Index -ge $firstRemoteWrite.Index) {
     throw "SQLite backup must run before production files change."
+}
+
+$migrationBackup = [regex]::Match($bash, '(?m)^backup_database "\$MIGRATION_BACKUP"\s*$')
+$maintenance = [regex]::Match($bash, '(?m)^php artisan down\b[^\r\n]*')
+if (-not $maintenance.Success -or -not $migrationBackup.Success -or
+    $maintenance.Index -ge $migrationBackup.Index -or $migrationBackup.Index -ge $migrations[0].Index) {
+    throw "A fresh migration backup must run in maintenance mode before migrations."
+}
+$backupFunction = [regex]::Match($bash, '(?ms)^backup_database\(\) \{\r?\n(?<body>.*?)^\}')
+if ($backupFunction.Groups['body'].Value -match '(?m)^\s*(?:find|rm)\b') {
+    throw "Backup creation must not prune recovery snapshots."
+}
+$complete = [regex]::Match($bash, '(?m)^complete_backups\s*$')
+$healthCheck = [regex]::Match($bash, '(?m)^curl --fail[^\r\n]*?/login"')
+if (-not $complete.Success -or -not $healthCheck.Success -or $complete.Index -le $healthCheck.Index) {
+    throw "Backup retention must run only after successful health checks."
 }
 
 $secureCookies = [regex]::Matches($bash, '(?m)^SESSION_SECURE_COOKIE=[^\r\n]*')

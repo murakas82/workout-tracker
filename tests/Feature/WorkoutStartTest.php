@@ -8,11 +8,11 @@ use App\Models\WorkoutSet;
 use App\Models\WorkoutTemplate;
 use App\Models\WorkoutType;
 use App\Services\WorkoutSessionService;
-use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Database\Events\QueryExecuted;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 use Tests\TestCase;
 
 class WorkoutStartTest extends TestCase
@@ -194,7 +194,7 @@ class WorkoutStartTest extends TestCase
 
         $this->assertThrows(
             fn () => app(WorkoutSessionService::class)->start($user, $type),
-            ModelNotFoundException::class,
+            ValidationException::class,
         );
 
         $this->assertDatabaseCount('workouts', 0);

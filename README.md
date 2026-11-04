@@ -109,4 +109,4 @@ From Git Bash:
 powershell.exe -ExecutionPolicy Bypass -File ./scripts/deploy-zone.ps1
 ```
 
-The server must have the `sqlite3` CLI. Deployment checks this before changing production files, then creates a consistent SQLite backup before migrations.
+The server must have the `sqlite3` CLI. Deployment takes an early safety backup, then a fresh backup in a brief maintenance window before migrations. Successful snapshots are in `storage/app/backups`; failed-attempt snapshots remain in its `pending` subfolder and do not count toward the 20-snapshot limit. Retention runs only after successful health checks. A failure during maintenance leaves the app down for recovery.

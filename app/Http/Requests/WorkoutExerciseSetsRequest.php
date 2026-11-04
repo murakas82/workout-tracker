@@ -44,7 +44,9 @@ class WorkoutExerciseSetsRequest extends FormRequest
                 $rowValid = true;
 
                 if ($weightValue === null) {
-                    $errors['working.'.$key.'.weight'] = $label.' weight must be between 0 and '.WorkoutSet::MAX_WEIGHT.' kg.';
+                    $errors['working.'.$key.'.weight'] = $this->isBlankInput($row['weight'] ?? null)
+                        ? $label.' needs a weight.'
+                        : $label.' weight must be between 0 and '.WorkoutSet::MAX_WEIGHT.' kg.';
                     $rowValid = false;
                 }
 
@@ -90,8 +92,16 @@ class WorkoutExerciseSetsRequest extends FormRequest
 
             $weightValue = $this->normalizeWeight($weight);
 
-            if ($weightValue === null || ! $this->isValidReps($reps)) {
-                $errors['drops.'.$index] = 'Drop sets need weights between 0 and '.WorkoutSet::MAX_WEIGHT.' kg and whole-number reps between 1 and '.WorkoutSet::MAX_REPS.'.';
+            if ($weightValue === null) {
+                $errors['drops.'.$index] = $this->isBlankInput($weight)
+                    ? 'Enter a weight for this drop set.'
+                    : 'Drop set weight must be between 0 and '.WorkoutSet::MAX_WEIGHT.' kg.';
+
+                continue;
+            }
+
+            if (! $this->isValidReps($reps)) {
+                $errors['drops.'.$index] = 'Drop set reps must be a whole number between 1 and '.WorkoutSet::MAX_REPS.'.';
 
                 continue;
             }

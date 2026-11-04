@@ -250,6 +250,9 @@ APP_NAME=__APP_NAME__
 MAIL_FROM_ADDRESS=__MAIL_FROM_ADDRESS__
 DB_FILE="$APP/database/database.sqlite"
 BACKUP_DIR="$APP/storage/app/backups"
+DEPLOY_ID="$(date +%Y%m%d-%H%M%S)-$$"
+PREDEPLOY_BACKUP="$BACKUP_DIR/pending/database-$DEPLOY_ID-predeploy.sqlite"
+MIGRATION_BACKUP="$BACKUP_DIR/pending/database-$DEPLOY_ID-premigrate.sqlite"
 
 fail() {
     echo "$1" >&2
@@ -261,22 +264,27 @@ remote_preflight() {
 }
 
 backup_database() {
+    local BACKUP_FILE="$1"
     if [ ! -s "$DB_FILE" ]; then
         return
     fi
 
-    mkdir -p "$BACKUP_DIR"
-
-    BACKUP_FILE="$BACKUP_DIR/database-$(date +%Y%m%d-%H%M%S).sqlite"
-
-    command -v sqlite3 >/dev/null 2>&1 || fail "sqlite3 is required for a consistent SQLite backup."
+    mkdir -p "$BACKUP_DIR/pending"
     sqlite3 "$DB_FILE" ".backup '$BACKUP_FILE'"
 
     chmod 600 "$BACKUP_FILE"
-    find "$BACKUP_DIR" -type f -name 'database-*.sqlite' -mtime +30 -delete
-    find "$BACKUP_DIR" -type f -name 'database-*.sqlite' | sort -r | tail -n +21 | xargs -r rm -f
-
     echo "Backed up database to $BACKUP_FILE"
+}
+
+complete_backups() {
+    if [ -f "$MIGRATION_BACKUP" ]; then
+        mv "$MIGRATION_BACKUP" "$BACKUP_DIR/database-$DEPLOY_ID.sqlite"
+        rm -f "$PREDEPLOY_BACKUP"
+        echo "Completed deployment backup: $BACKUP_DIR/database-$DEPLOY_ID.sqlite"
+    fi
+    find "$BACKUP_DIR" -maxdepth 1 -type f -name 'database-*.sqlite' -mtime +30 -delete
+    find "$BACKUP_DIR" -maxdepth 1 -type f -name 'database-*.sqlite' | sort -r | tail -n +21 | xargs -r rm -f
+    find "$BACKUP_DIR/pending" -type f -name 'database-*.sqlite' -mtime +30 -delete
 }
 
 case "$APP" in /*) ;; *) fail "RemoteApp must be an absolute path." ;; esac
@@ -298,7 +306,7 @@ if [ -z "$BASE_URI_PATH" ]; then
 fi
 
 remote_preflight
-backup_database
+backup_database "$PREDEPLOY_BACKUP"
 
 mkdir -p "$APP" "$WEB"
 cd "$APP"
@@ -364,7 +372,7 @@ VITE_APP_NAME="$APP_NAME"
 EOF
 chmod 600 .env
 
-mkdir -p database storage/app/backups
+mkdir -p database storage/app/backups/pending
 touch "$DB_FILE"
 composer install --no-dev --optimize-autoloader --no-interaction
 npm ci
@@ -375,6 +383,8 @@ if [ -z "$EXISTING_KEY" ]; then
     php artisan key:generate --force --ansi
 fi
 
+php artisan down --retry=60 --ansi
+backup_database "$MIGRATION_BACKUP"
 php artisan migrate --force --ansi
 php artisan config:cache --ansi
 php artisan route:cache --ansi
@@ -441,8 +451,11 @@ ln -s "$APP/public/service-worker.js" "$WEB/service-worker.js"
 
 rm -rf "$APP/node_modules"
 
-curl -I --max-time 20 "$PUBLIC_URL"
-curl -I --max-time 20 "$PUBLIC_URL/build/manifest.json"
+php artisan up --ansi
+curl --fail -I --max-time 20 "$PUBLIC_URL"
+curl --fail -I --max-time 20 "$PUBLIC_URL/build/manifest.json"
+curl --fail --silent --show-error --max-time 20 --output /dev/null "${PUBLIC_URL%/}/login"
+complete_backups
 
 echo "DEPLOYED $PUBLIC_URL"
 '@

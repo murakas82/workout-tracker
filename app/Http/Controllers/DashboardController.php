@@ -15,11 +15,8 @@ class DashboardController extends Controller
         $user = $request->user();
 
         $inProgress = Workout::query()
-            ->where('user_id', $user->id)
-            ->where('status', Workout::STATUS_IN_PROGRESS)
-            ->whereHas('exercises')
+            ->inProgressFor($user)
             ->with('workoutType')
-            ->latest('updated_at')
             ->first();
 
         $lastWorkout = Workout::query()

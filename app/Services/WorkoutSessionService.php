@@ -36,9 +36,16 @@ class WorkoutSessionService
 
                 $template = WorkoutTemplate::query()
                     ->where('workout_type_id', $type->id)
-                    ->where('active', true)
+                    ->startable()
                     ->with('templateExercises.exercise')
-                    ->firstOrFail();
+                    ->orderBy('id')
+                    ->first();
+
+                if (! $template) {
+                    throw ValidationException::withMessages([
+                        'workout_type' => 'Add an active exercise before starting this workout.',
+                    ]);
+                }
 
                 // Number workout exercises 1..n in template order. Template positions can have
                 // gaps (archived exercises) or duplicates, but navigation expects consecutive positions.
@@ -138,19 +145,9 @@ class WorkoutSessionService
 
     private function inProgressFor(User $user): ?Workout
     {
-        Workout::query()
-            ->where('user_id', $user->id)
-            ->where('status', Workout::STATUS_IN_PROGRESS)
-            ->whereDoesntHave('exercises')
-            ->update(['status' => Workout::STATUS_CANCELLED]);
-
         return Workout::query()
-            ->where('user_id', $user->id)
-            ->where('status', Workout::STATUS_IN_PROGRESS)
-            ->whereHas('exercises')
+            ->inProgressFor($user)
             ->with('workoutType', 'exercises.sets')
-            ->latest('updated_at')
-            ->latest('id')
             ->first();
     }
 }

@@ -9,6 +9,8 @@ $source = (Get-Content -LiteralPath $deployPath -Raw) -replace "`r`n", "`n"
 $fixtureRoot = Join-Path ([System.IO.Path]::GetTempPath()) ('workout-deploy-check-tests-' + [Guid]::NewGuid().ToString('N'))
 New-Item -ItemType Directory -Path $fixtureRoot | Out-Null
 $script:Passed = 0
+$earlyBackupCall = 'backup_database "$PREDEPLOY_BACKUP"'
+$migrationBackupCall = 'backup_database "$MIGRATION_BACKUP"'
 
 function New-CheckFixture {
     param([string] $Name, [string] $DeploySource)
@@ -49,13 +51,16 @@ try {
         @{ Name = 'migration-not-forced'; Source = $source.Replace('php artisan migrate --force --ansi', 'php artisan migrate --ansi'); Error = 'non-interactive migrations' },
         @{ Name = 'separate-seed'; Source = $source.Replace('php artisan view:cache --ansi', "php artisan view:cache --ansi`nphp artisan db:seed --force"); Error = 'must not seed or reset' },
         @{ Name = 'database-wipe'; Source = $source.Replace('php artisan view:cache --ansi', "php artisan view:cache --ansi`nphp artisan db:wipe --force"); Error = 'must not seed or reset' },
-        @{ Name = 'backup-missing'; Source = $source.Replace("`nbackup_database`n", "`n# backup omitted`n"); Error = 'backup must run before migrations' },
-        @{ Name = 'backup-too-late'; Source = $source.Replace("`nbackup_database`n", "`n").Replace('php artisan migrate --force --ansi', "php artisan migrate --force --ansi`nbackup_database"); Error = 'backup must run before migrations' },
+        @{ Name = 'backup-missing'; Source = $source.Replace("`n$earlyBackupCall`n", "`n# backup omitted`n"); Error = 'backup must run before migrations' },
+        @{ Name = 'backup-too-late'; Source = $source.Replace("`n$earlyBackupCall`n", "`n").Replace('php artisan migrate --force --ansi', "php artisan migrate --force --ansi`n$earlyBackupCall"); Error = 'backup must run before migrations' },
         @{ Name = 'raw-backup-copy'; Source = $source.Replace('chmod 600 "$BACKUP_FILE"', "cp `"`$DB_FILE`" `"`$BACKUP_FILE`"`n    chmod 600 `"`$BACKUP_FILE`""); Error = 'Raw copying' },
-        @{ Name = 'sqlite-check-missing'; Source = $source.Replace('command -v sqlite3 >/dev/null 2>&1 || fail "sqlite3 is required for a consistent SQLite backup."', 'true'); Error = 'Missing SQLite backup protection' },
+        @{ Name = 'sqlite-check-missing'; Source = $source.Replace('command -v sqlite3 >/dev/null 2>&1 || fail "sqlite3 is required for a consistent SQLite backup."', 'true'); Error = 'Remote preflight must check sqlite3' },
         @{ Name = 'remote-preflight-missing'; Source = $source.Replace("`nremote_preflight`n", "`n"); Error = 'Remote preflight must check sqlite3' },
         @{ Name = 'remote-preflight-too-late'; Source = $source.Replace("`nremote_preflight`n", "`n").Replace('git reset --hard FETCH_HEAD', "git reset --hard FETCH_HEAD`nremote_preflight"); Error = 'Remote preflight must check sqlite3' },
-        @{ Name = 'backup-after-reset'; Source = $source.Replace("`nbackup_database`n", "`n").Replace('git reset --hard FETCH_HEAD', "git reset --hard FETCH_HEAD`nbackup_database"); Error = 'backup must run before production files change' },
+        @{ Name = 'backup-after-reset'; Source = $source.Replace("`n$earlyBackupCall`n", "`n").Replace('git reset --hard FETCH_HEAD', "git reset --hard FETCH_HEAD`n$earlyBackupCall"); Error = 'backup must run before production files change' },
+        @{ Name = 'migration-backup-missing'; Source = $source.Replace("`n$migrationBackupCall`n", "`n"); Error = 'fresh migration backup' },
+        @{ Name = 'maintenance-missing'; Source = $source.Replace('php artisan down --retry=60 --ansi', 'true'); Error = 'fresh migration backup' },
+        @{ Name = 'early-retention'; Source = $source.Replace("`ncomplete_backups`n", "`n").Replace('npm ci', "complete_backups`nnpm ci"); Error = 'retention must run only after' },
         @{ Name = 'secure-cookie-disabled'; Source = $source.Replace('SESSION_SECURE_COOKIE=true', 'SESSION_SECURE_COOKIE=false'); Error = 'enable secure session cookies' },
         @{ Name = 'preflight-missing'; Source = $source.Replace("`nInvoke-DeploymentPreflight`n", "`n# preflight omitted`n"); Error = 'preflight must run before' },
         @{ Name = 'preflight-too-late'; Source = $source.Replace("`nInvoke-DeploymentPreflight`n", "`n").Replace("`nPush-Code`n", "`nPush-Code`nInvoke-DeploymentPreflight`n"); Error = 'preflight must run before' },
@@ -81,6 +86,7 @@ try {
     }
 
     $safeVariations = @(
+        @{ Name = 'reword-sqlite-error'; Source = $source.Replace('sqlite3 is required for a consistent SQLite backup.', 'Install sqlite3 before deploying.') },
         @{ Name = 'extra-logging'; Source = $source.Replace('function Invoke-DeploymentPreflight {', "function Invoke-DeploymentPreflight {`n    Write-Host 'Starting safety checks'") },
         @{ Name = 'different-logging'; Source = $source.Replace('Write-Step "Checking deployment data protection"', "Write-Step 'Checking release safety'") },
         @{ Name = 'multiline-single-quotes'; Source = $source.Replace('& (Join-Path $PSScriptRoot "check-deploy-data-protection.ps1")', "& (`n        Join-Path `$PSScriptRoot 'check-deploy-data-protection.ps1'`n    )") },

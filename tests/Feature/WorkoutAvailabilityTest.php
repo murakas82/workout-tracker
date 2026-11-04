@@ -8,7 +8,10 @@ use App\Models\Workout;
 use App\Models\WorkoutTemplate;
 use App\Models\WorkoutType;
 use App\Services\WorkoutRotationService;
+use App\Services\WorkoutSessionService;
+use Illuminate\Database\Events\QueryExecuted;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
 
 class WorkoutAvailabilityTest extends TestCase
@@ -59,41 +62,34 @@ class WorkoutAvailabilityTest extends TestCase
         }
     }
 
-    public function test_start_cancels_only_the_users_legacy_empty_workout(): void
+    public function test_available_templates_and_start_use_the_same_eligibility_rule(): void
     {
         $user = User::factory()->create();
-        $other = User::factory()->create();
         $type = WorkoutType::query()->where('code', 'push')->firstOrFail();
-        $empty = $this->emptyWorkout($user, $type);
-        $othersEmpty = $this->emptyWorkout($other, $type);
+        $original = $type->templates()->firstOrFail();
+        $links = $original->templateExercises()->get();
+        $usable = $type->templates()->create(['name' => 'Usable alternate', 'active' => true]);
+        foreach ($links as $link) {
+            $usable->templateExercises()->create(['exercise_id' => $link->exercise_id, 'position' => $link->position]);
+        }
+        $original->templateExercises()->delete();
 
-        $this->actingAs($user)->get(route('dashboard'))->assertOk()->assertDontSee('Continue workout');
-        $this->post(route('workouts.start', $type))->assertRedirect();
-        $this->assertSame(Workout::STATUS_CANCELLED, $empty->fresh()->status);
-        $this->assertSame(Workout::STATUS_IN_PROGRESS, $othersEmpty->fresh()->status);
-        $active = $user->workouts()->where('status', Workout::STATUS_IN_PROGRESS)->firstOrFail();
-        $this->assertNotSame($empty->id, $active->id);
-        $this->assertGreaterThan(0, $active->exercises()->count());
-        $this->get(route('workouts.show', $active))->assertOk();
+        $this->assertSame('push', app(WorkoutRotationService::class)->nextFor($user)->code);
+        $workout = app(WorkoutSessionService::class)->start($user, $type);
+        $this->assertSame($links->pluck('exercise_id')->all(), $workout->exercises->pluck('exercise_id')->all());
     }
 
-    public function test_opening_a_legacy_empty_session_recovers_to_dashboard(): void
+    public function test_workout_list_reuses_the_available_types_query(): void
     {
         $user = User::factory()->create();
-        $type = WorkoutType::query()->firstOrFail();
-        $empty = $this->emptyWorkout($user, $type);
+        $queries = [];
+        DB::listen(function (QueryExecuted $query) use (&$queries): void {
+            if (str_contains($query->sql, 'from "workout_types"') && str_contains($query->sql, 'exists')) {
+                $queries[] = $query->sql;
+            }
+        });
 
-        $this->actingAs($user)->get(route('workouts.show', $empty))
-            ->assertRedirect(route('dashboard'))->assertSessionHas('status');
-        $this->assertSame(Workout::STATUS_CANCELLED, $empty->fresh()->status);
-        $this->assertDatabaseHas('workouts', ['id' => $empty->id]);
-    }
-
-    private function emptyWorkout(User $user, WorkoutType $type): Workout
-    {
-        return Workout::query()->create([
-            'user_id' => $user->id, 'workout_type_id' => $type->id,
-            'status' => Workout::STATUS_IN_PROGRESS,
-        ]);
+        $this->actingAs($user)->get(route('workouts.index'))->assertOk();
+        $this->assertCount(1, $queries);
     }
 }

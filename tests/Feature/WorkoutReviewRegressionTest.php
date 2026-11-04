@@ -74,6 +74,20 @@ class WorkoutReviewRegressionTest extends TestCase
         ];
     }
 
+    public function test_blank_weight_has_a_required_message_instead_of_a_range_message(): void
+    {
+        [$workout, $exercise] = $this->startWorkout();
+        $working = $this->workingSets();
+        $working[1]['weight'] = '';
+        $response = $this->postJson(route('workouts.exercises.save', [$workout, $exercise]), ['working' => $working])
+            ->assertUnprocessable()->assertJsonValidationErrors('working.1.weight');
+        $this->assertSame('Set 1 needs a weight.', $response->json('errors')['working.1.weight'][0]);
+        $response = $this->postJson(route('workouts.exercises.save', [$workout, $exercise]), [
+            'working' => $this->workingSets(), 'drops' => [['weight' => '', 'reps' => 10]],
+        ])->assertUnprocessable()->assertJsonValidationErrors('drops.0');
+        $this->assertSame('Enter a weight for this drop set.', $response->json('errors')['drops.0'][0]);
+    }
+
     #[DataProvider('invalidReps')]
     public function test_invalid_reps_cannot_overflow_working_or_drop_sets(string $reps): void
     {
