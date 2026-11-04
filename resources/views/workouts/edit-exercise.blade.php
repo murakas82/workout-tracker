@@ -4,22 +4,15 @@
     @php
         $progression = app(\App\Services\ProgressionService::class);
         $existingSets = $exercise->sets;
-        $workingInput = old('working', []);
-        $workingInput = is_array($workingInput) ? $workingInput : [];
-        $dropInput = old('drops', $existingSets->where('set_type', 'drop')->values()->map(fn ($set) => [
+        $dropInput = \App\Http\Requests\WorkoutExerciseSetsRequest::oldDropRows($existingSets->where('set_type', 'drop')->values()->map(fn ($set) => [
             'side' => $set->side,
             'weight' => $progression->formatWeight((float) $set->weight),
             'reps' => $set->reps,
         ])->all());
-        $dropInput = array_map(
-            fn ($row) => is_array($row) ? array_map(fn ($value) => is_scalar($value) ? $value : '', $row) : [],
-            is_array($dropInput) ? array_values($dropInput) : [],
-        );
         $dropSlots = max(3, count($dropInput) + 3);
-        $workingValue = function (?string $side, int $setNumber, string $field) use ($workingInput, $existingSets, $progression) {
-            $path = $side === null ? $setNumber.'.'.$field : $side.'.'.$setNumber.'.'.$field;
-            $oldValue = data_get($workingInput, $path);
-            if (is_scalar($oldValue)) {
+        $workingValue = function (?string $side, int $setNumber, string $field) use ($existingSets, $progression) {
+            $oldValue = \App\Http\Requests\WorkoutExerciseSetsRequest::oldWorkingValue($side, $setNumber, $field);
+            if ($oldValue !== null) {
                 return $oldValue;
             }
 
@@ -64,11 +57,11 @@
                                 <p class="set-number">{{ $set }}</p>
                                 <div>
                                     <label class="sr-only" for="working_{{ $side }}_{{ $set }}_weight">{{ $label }} set {{ $set }} weight</label>
-                                    <input class="input-compact" id="working_{{ $side }}_{{ $set }}_weight" name="working[{{ $side }}][{{ $set }}][weight]" value="{{ $workingValue($side, $set, 'weight') }}" placeholder="Weight" inputmode="decimal" type="number" min="0" step="0.01">
+                                    <input class="input-compact" id="working_{{ $side }}_{{ $set }}_weight" name="working[{{ $side }}][{{ $set }}][weight]" value="{{ $workingValue($side, $set, 'weight') }}" placeholder="Weight" inputmode="decimal" type="number" max="{{ \App\Models\WorkoutSet::MAX_WEIGHT }}" min="0" step="0.01">
                                 </div>
                                 <div>
                                     <label class="sr-only" for="working_{{ $side }}_{{ $set }}_reps">{{ $label }} set {{ $set }} reps</label>
-                                    <input class="input-compact" id="working_{{ $side }}_{{ $set }}_reps" name="working[{{ $side }}][{{ $set }}][reps]" value="{{ $workingValue($side, $set, 'reps') }}" placeholder="Reps" inputmode="numeric" type="number" min="1" step="1">
+                                    <input class="input-compact" id="working_{{ $side }}_{{ $set }}_reps" name="working[{{ $side }}][{{ $set }}][reps]" value="{{ $workingValue($side, $set, 'reps') }}" placeholder="Reps" inputmode="numeric" type="number" max="{{ \App\Models\WorkoutSet::MAX_REPS }}" min="1" step="1">
                                 </div>
                             </div>
                         @endfor
@@ -81,11 +74,11 @@
                             <p class="set-number">{{ $set }}</p>
                             <div>
                                 <label class="sr-only" for="working_{{ $set }}_weight">Set {{ $set }} weight</label>
-                                <input class="input-compact" id="working_{{ $set }}_weight" name="working[{{ $set }}][weight]" value="{{ $workingValue(null, $set, 'weight') }}" placeholder="Weight" inputmode="decimal" type="number" min="0" step="0.01">
+                                <input class="input-compact" id="working_{{ $set }}_weight" name="working[{{ $set }}][weight]" value="{{ $workingValue(null, $set, 'weight') }}" placeholder="Weight" inputmode="decimal" type="number" max="{{ \App\Models\WorkoutSet::MAX_WEIGHT }}" min="0" step="0.01">
                             </div>
                             <div>
                                 <label class="sr-only" for="working_{{ $set }}_reps">Set {{ $set }} reps</label>
-                                <input class="input-compact" id="working_{{ $set }}_reps" name="working[{{ $set }}][reps]" value="{{ $workingValue(null, $set, 'reps') }}" placeholder="Reps" inputmode="numeric" type="number" min="1" step="1">
+                                <input class="input-compact" id="working_{{ $set }}_reps" name="working[{{ $set }}][reps]" value="{{ $workingValue(null, $set, 'reps') }}" placeholder="Reps" inputmode="numeric" type="number" max="{{ \App\Models\WorkoutSet::MAX_REPS }}" min="1" step="1">
                             </div>
                         </div>
                     @endfor
@@ -116,11 +109,11 @@
                             @endif
                             <div>
                                 <label class="sr-only" for="drop_{{ $i }}_weight">Drop set {{ $i + 1 }} weight</label>
-                                <input class="input-compact" id="drop_{{ $i }}_weight" name="drops[{{ $i }}][weight]" value="{{ $drop['weight'] ?? '' }}" placeholder="Weight" inputmode="decimal" type="number" min="0" step="0.01">
+                                <input class="input-compact" id="drop_{{ $i }}_weight" name="drops[{{ $i }}][weight]" value="{{ $drop['weight'] ?? '' }}" placeholder="Weight" inputmode="decimal" type="number" max="{{ \App\Models\WorkoutSet::MAX_WEIGHT }}" min="0" step="0.01">
                             </div>
                             <div>
                                 <label class="sr-only" for="drop_{{ $i }}_reps">Drop set {{ $i + 1 }} reps</label>
-                                <input class="input-compact" id="drop_{{ $i }}_reps" name="drops[{{ $i }}][reps]" value="{{ $drop['reps'] ?? '' }}" placeholder="Reps" inputmode="numeric" type="number" min="1" step="1">
+                                <input class="input-compact" id="drop_{{ $i }}_reps" name="drops[{{ $i }}][reps]" value="{{ $drop['reps'] ?? '' }}" placeholder="Reps" inputmode="numeric" type="number" max="{{ \App\Models\WorkoutSet::MAX_REPS }}" min="1" step="1">
                             </div>
                         </div>
                     @endfor

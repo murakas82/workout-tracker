@@ -16,25 +16,32 @@
         @endif
 
         <div class="panel">
-            <p class="text-sm font-black uppercase text-zinc-400">Recommended</p>
-            <h2 class="mt-2 text-4xl font-black uppercase text-zinc-50">{{ $nextType->name }}</h2>
-            <form method="POST" action="{{ route('workouts.start', $nextType) }}" class="mt-4">
-                @csrf
-                <button class="button-primary">Start {{ $nextType->name }}</button>
-            </form>
+            @if ($nextType)
+                <p class="text-sm font-black uppercase text-zinc-400">Recommended</p>
+                <h2 class="mt-2 text-4xl font-black uppercase text-zinc-50">{{ $nextType->name }}</h2>
+                <form method="POST" action="{{ route('workouts.start', $nextType) }}" class="mt-4">
+                    @csrf
+                    <button class="button-primary">Start {{ $nextType->name }}</button>
+                </form>
+            @else
+                <h2 class="text-xl font-black">No active workouts</h2>
+                <a href="{{ route('settings.index') }}" class="mt-4 button-primary">Manage exercises</a>
+            @endif
         </div>
 
-        <div class="space-y-3">
-            <h2 class="text-lg font-black">Choose Different Workout</h2>
-            @foreach ($types as $type)
-                <form method="POST" action="{{ route('workouts.start', $type) }}">
-                    @csrf
-                    <button class="button-secondary w-full justify-between" type="submit">
-                        <span>{{ $type->name }}</span>
-                        <span>Start</span>
-                    </button>
-                </form>
-            @endforeach
-        </div>
+        @if ($types->isNotEmpty())
+            <div class="space-y-3">
+                <h2 class="text-lg font-black">Choose Different Workout</h2>
+                @foreach ($types as $type)
+                    <form method="POST" action="{{ route('workouts.start', $type) }}">
+                        @csrf
+                        <button class="button-secondary w-full justify-between" type="submit">
+                            <span>{{ $type->name }}</span>
+                            <span>Start</span>
+                        </button>
+                    </form>
+                @endforeach
+            </div>
+        @endif
     </section>
 @endsection

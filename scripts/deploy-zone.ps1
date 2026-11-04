@@ -256,6 +256,10 @@ fail() {
     exit 1
 }
 
+remote_preflight() {
+    command -v sqlite3 >/dev/null 2>&1 || fail "sqlite3 is required for a consistent SQLite backup."
+}
+
 backup_database() {
     if [ ! -s "$DB_FILE" ]; then
         return
@@ -292,6 +296,9 @@ if [ -z "$BASE_URI_PATH" ]; then
     REWRITE_BASE="/"
     SESSION_PATH="/"
 fi
+
+remote_preflight
+backup_database
 
 mkdir -p "$APP" "$WEB"
 cd "$APP"
@@ -358,7 +365,6 @@ EOF
 chmod 600 .env
 
 mkdir -p database storage/app/backups
-backup_database
 touch "$DB_FILE"
 composer install --no-dev --optimize-autoloader --no-interaction
 npm ci

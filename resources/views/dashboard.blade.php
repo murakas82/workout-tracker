@@ -20,13 +20,18 @@
         @endif
 
         <div class="panel">
-            <p class="text-sm font-black uppercase text-lime-300">Next workout</p>
-            <h1 class="mt-2 text-6xl font-black uppercase leading-none text-zinc-50">{{ $nextType->name }}</h1>
-            <form method="POST" action="{{ route('workouts.start', $nextType) }}" class="mt-5">
-                @csrf
-                <button class="button-primary" type="submit">Start {{ $nextType->name }} workout</button>
-            </form>
-            <a href="{{ route('workouts.index') }}" class="mt-3 button-secondary w-full">Choose different workout</a>
+            @if ($nextType)
+                <p class="text-sm font-black uppercase text-lime-300">Next workout</p>
+                <h1 class="mt-2 text-6xl font-black uppercase leading-none text-zinc-50">{{ $nextType->name }}</h1>
+                <form method="POST" action="{{ route('workouts.start', $nextType) }}" class="mt-5">
+                    @csrf
+                    <button class="button-primary" type="submit">Start {{ $nextType->name }} workout</button>
+                </form>
+                <a href="{{ route('workouts.index') }}" class="mt-3 button-secondary w-full">Choose different workout</a>
+            @else
+                <h1 class="text-2xl font-black text-zinc-50">No active workouts</h1>
+                <a href="{{ route('settings.index') }}" class="mt-4 button-primary">Manage exercises</a>
+            @endif
         </div>
 
         <div class="panel">

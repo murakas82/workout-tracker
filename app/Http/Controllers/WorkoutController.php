@@ -23,10 +23,11 @@ class WorkoutController extends Controller
     {
         return view('workouts.index', [
             'nextType' => $rotation->nextFor($request->user()),
-            'types' => WorkoutType::query()->orderBy('sort_order')->get(),
+            'types' => $rotation->availableTypes(),
             'inProgress' => Workout::query()
                 ->where('user_id', $request->user()->id)
                 ->where('status', Workout::STATUS_IN_PROGRESS)
+                ->whereHas('exercises')
                 ->with('workoutType')
                 ->latest('updated_at')
                 ->first(),
@@ -45,7 +46,7 @@ class WorkoutController extends Controller
         return $response;
     }
 
-    public function show(Request $request, Workout $workout, ?int $position = null): View|RedirectResponse
+    public function show(Request $request, Workout $workout, WorkoutSessionService $sessions, ?int $position = null): View|RedirectResponse
     {
         Gate::authorize('view', $workout);
 
@@ -56,6 +57,12 @@ class WorkoutController extends Controller
         }
 
         $workout->load('workoutType', 'exercises.sets');
+
+        if ($workout->exercises->isEmpty()) {
+            $sessions->cancel($workout);
+
+            return redirect()->route('dashboard')->with('status', 'This workout has no exercises. Choose another workout.');
+        }
 
         $position ??= $workout->current_exercise_index;
         $position = max(1, min($position, $workout->exercises->count()));

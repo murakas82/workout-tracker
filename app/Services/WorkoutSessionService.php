@@ -138,9 +138,16 @@ class WorkoutSessionService
 
     private function inProgressFor(User $user): ?Workout
     {
+        Workout::query()
+            ->where('user_id', $user->id)
+            ->where('status', Workout::STATUS_IN_PROGRESS)
+            ->whereDoesntHave('exercises')
+            ->update(['status' => Workout::STATUS_CANCELLED]);
+
         return Workout::query()
             ->where('user_id', $user->id)
             ->where('status', Workout::STATUS_IN_PROGRESS)
+            ->whereHas('exercises')
             ->with('workoutType', 'exercises.sets')
             ->latest('updated_at')
             ->latest('id')

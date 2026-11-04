@@ -44,12 +44,12 @@ class WorkoutExerciseSetsRequest extends FormRequest
                 $rowValid = true;
 
                 if ($weightValue === null) {
-                    $errors['working.'.$key.'.weight'] = $label.' needs a valid weight.';
+                    $errors['working.'.$key.'.weight'] = $label.' weight must be between 0 and '.WorkoutSet::MAX_WEIGHT.' kg.';
                     $rowValid = false;
                 }
 
                 if (! $this->isValidReps($reps)) {
-                    $errors['working.'.$key.'.reps'] = $label.' needs valid reps.';
+                    $errors['working.'.$key.'.reps'] = $label.' reps must be a whole number between 1 and '.WorkoutSet::MAX_REPS.'.';
                     $rowValid = false;
                 }
 
@@ -91,7 +91,7 @@ class WorkoutExerciseSetsRequest extends FormRequest
             $weightValue = $this->normalizeWeight($weight);
 
             if ($weightValue === null || ! $this->isValidReps($reps)) {
-                $errors['drops.'.$index] = 'Drop sets need valid weight and reps.';
+                $errors['drops.'.$index] = 'Drop sets need weights between 0 and '.WorkoutSet::MAX_WEIGHT.' kg and whole-number reps between 1 and '.WorkoutSet::MAX_REPS.'.';
 
                 continue;
             }
@@ -134,7 +134,7 @@ class WorkoutExerciseSetsRequest extends FormRequest
 
         $weight = (float) $weight;
 
-        return is_finite($weight) && $weight >= 0 && $weight <= 99999.99 ? $weight : null;
+        return is_finite($weight) && $weight >= 0 && $weight <= WorkoutSet::MAX_WEIGHT ? $weight : null;
     }
 
     /**
@@ -149,7 +149,28 @@ class WorkoutExerciseSetsRequest extends FormRequest
 
     private function isValidReps(mixed $reps): bool
     {
-        return (is_int($reps) || is_string($reps)) && ctype_digit((string) $reps) && (int) $reps >= 1;
+        return (is_int($reps) || is_string($reps))
+            && ctype_digit((string) $reps)
+            && (int) $reps >= 1
+            && (int) $reps <= WorkoutSet::MAX_REPS;
+    }
+
+    public static function oldWorkingValue(?string $side, int $setNumber, string $field): string|int|float|bool|null
+    {
+        $path = $side === null ? $setNumber.'.'.$field : $side.'.'.$setNumber.'.'.$field;
+        $value = data_get(old('working', []), $path);
+
+        return is_scalar($value) ? $value : null;
+    }
+
+    public static function oldDropRows(array $default = []): array
+    {
+        $rows = old('drops', $default);
+
+        return array_map(
+            fn ($row) => is_array($row) ? array_map(fn ($value) => is_scalar($value) ? $value : '', $row) : [],
+            is_array($rows) ? array_values($rows) : [],
+        );
     }
 
     private function isBlankInput(mixed $value): bool

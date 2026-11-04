@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\User;
 use App\Models\Workout;
+use App\Models\WorkoutSet;
 use App\Models\WorkoutType;
 use App\Services\WorkoutSessionService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -39,7 +40,7 @@ class WorkoutReviewRegressionTest extends TestCase
         $this->assertSame(1, $xpath->query('//button[@type="submit" and @form="workout-exercise-form"]')->length);
 
         $this->post($laterForm->getAttribute('action'))->assertRedirect(route('workouts.exercise', [$workout, 1]));
-        $this->assertSame(7, $exercise->fresh()->position);
+        $this->assertSame($workout->exercises()->count(), $exercise->fresh()->position);
         $this->assertNull($exercise->fresh()->completed_at);
         $this->assertDatabaseCount('workout_sets', 0);
     }
@@ -71,6 +72,43 @@ class WorkoutReviewRegressionTest extends TestCase
             'negative' => ['-0.01'],
             'not numeric' => ['NaN'],
         ];
+    }
+
+    #[DataProvider('invalidReps')]
+    public function test_invalid_reps_cannot_overflow_working_or_drop_sets(string $reps): void
+    {
+        [$workout, $exercise] = $this->startWorkout();
+        $working = $this->workingSets();
+        $working[1]['reps'] = $reps;
+        $this->postJson(route('workouts.exercises.save', [$workout, $exercise]), ['working' => $working])
+            ->assertUnprocessable()->assertJsonValidationErrors('working.1.reps');
+        $this->postJson(route('workouts.exercises.save', [$workout, $exercise]), [
+            'working' => $this->workingSets(), 'drops' => [['weight' => 10, 'reps' => $reps]],
+        ])->assertUnprocessable()->assertJsonValidationErrors('drops.0');
+        $this->assertDatabaseCount('workout_sets', 0);
+    }
+
+    public static function invalidReps(): array
+    {
+        return [
+            'overflow' => ['99999999999999999999'],
+            'over limit' => ['1001'],
+            'zero' => ['0'],
+            'fractional' => ['1.5'],
+        ];
+    }
+
+    public function test_rep_upper_boundary_and_browser_limits_match_validation(): void
+    {
+        [$workout, $exercise] = $this->startWorkout();
+        $working = $this->workingSets();
+        $working[1]['reps'] = (string) WorkoutSet::MAX_REPS;
+        $this->post(route('workouts.exercises.save', [$workout, $exercise]), ['working' => $working])->assertRedirect();
+        $this->assertSame(WorkoutSet::MAX_REPS, $exercise->sets()->where('set_number', 1)->firstOrFail()->reps);
+        $this->assertInputLimits($this->get(route('workouts.exercise', [$workout, 1]))->assertOk()->getContent());
+
+        app(WorkoutSessionService::class)->finish($workout);
+        $this->assertInputLimits($this->get(route('history.exercises.edit', [$workout, $exercise]))->assertOk()->getContent());
     }
 
     #[DataProvider('validWeights')]
@@ -161,6 +199,17 @@ class WorkoutReviewRegressionTest extends TestCase
         $this->actingAs($user);
 
         return [$workout, $workout->exercises->first()];
+    }
+
+    private function assertInputLimits(string $html): void
+    {
+        $document = new \DOMDocument;
+        $document->loadHTML($html, LIBXML_NOERROR | LIBXML_NOWARNING);
+        $xpath = new \DOMXPath($document);
+        foreach ($xpath->query('//input[@type="number"]') as $input) {
+            $maximum = str_ends_with($input->getAttribute('name'), '[weight]') ? WorkoutSet::MAX_WEIGHT : WorkoutSet::MAX_REPS;
+            $this->assertSame((string) $maximum, $input->getAttribute('max'));
+        }
     }
 
     private function workingSets(): array

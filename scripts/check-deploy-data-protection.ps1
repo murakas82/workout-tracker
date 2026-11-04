@@ -52,6 +52,20 @@ if ($bash -match '(?m)^[ \t]*cp\s+"\$DB_FILE"') {
     throw "Raw copying of the live SQLite database is unsafe."
 }
 
+$remotePreflight = [regex]::Match($bash, '(?ms)^remote_preflight\(\) \{\r?\n(?<body>.*?)^\}')
+$remotePreflightCall = [regex]::Match($bash, '(?m)^remote_preflight[ \t]*\r?$')
+$firstRemoteWrite = [regex]::Match($bash, '(?m)^(?:mkdir -p "\$APP"|git (?:init|remote|fetch|symbolic-ref|reset)|cat > \.env)')
+if (-not $remotePreflight.Success -or
+    -not $remotePreflight.Groups['body'].Value.Contains('command -v sqlite3 >/dev/null 2>&1 || fail "sqlite3 is required for a consistent SQLite backup."') -or
+    -not $remotePreflightCall.Success -or -not $firstRemoteWrite.Success -or
+    $remotePreflightCall.Index -ge $firstRemoteWrite.Index) {
+    throw "Remote preflight must check sqlite3 before modifying the application, environment, or repository."
+}
+
+if ($backup.Index -ge $firstRemoteWrite.Index) {
+    throw "SQLite backup must run before production files change."
+}
+
 $secureCookies = [regex]::Matches($bash, '(?m)^SESSION_SECURE_COOKIE=[^\r\n]*')
 if ($secureCookies.Count -ne 1 -or $secureCookies[0].Value -ne 'SESSION_SECURE_COOKIE=true') {
     throw "Production must enable secure session cookies."
