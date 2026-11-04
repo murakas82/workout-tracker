@@ -265,11 +265,8 @@ backup_database() {
 
     BACKUP_FILE="$BACKUP_DIR/database-$(date +%Y%m%d-%H%M%S).sqlite"
 
-    if command -v sqlite3 >/dev/null 2>&1; then
-        sqlite3 "$DB_FILE" ".backup '$BACKUP_FILE'"
-    else
-        cp "$DB_FILE" "$BACKUP_FILE"
-    fi
+    command -v sqlite3 >/dev/null 2>&1 || fail "sqlite3 is required for a consistent SQLite backup."
+    sqlite3 "$DB_FILE" ".backup '$BACKUP_FILE'"
 
     chmod 600 "$BACKUP_FILE"
     find "$BACKUP_DIR" -type f -name 'database-*.sqlite' -mtime +30 -delete

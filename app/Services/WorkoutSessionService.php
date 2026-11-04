@@ -10,6 +10,7 @@ use App\Models\WorkoutTemplate;
 use App\Models\WorkoutType;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 
 class WorkoutSessionService
 {
@@ -62,6 +63,12 @@ class WorkoutSessionService
                         'rest_min_seconds' => $exercise->rest_min_seconds,
                         'rest_max_seconds' => $exercise->rest_max_seconds,
                         'unilateral' => $exercise->unilateral,
+                    ]);
+                }
+
+                if ($position === 0) {
+                    throw ValidationException::withMessages([
+                        'workout_type' => 'Add an active exercise before starting this workout.',
                     ]);
                 }
 

@@ -96,6 +96,7 @@ php artisan serve
 
 ```bash
 composer exec -- php artisan test
+npm test
 ```
 
 ## Zone.ee Deployment
@@ -108,4 +109,4 @@ From Git Bash:
 powershell.exe -ExecutionPolicy Bypass -File ./scripts/deploy-zone.ps1
 ```
 
-The deploy script backs up the SQLite database before migrations.
+The deploy script backs up the SQLite database before migrations. The server must have the `sqlite3` CLI; deployment stops if a consistent backup cannot be created.

@@ -40,12 +40,16 @@ foreach ($required in @(
     'backup_database() {',
     'if [ ! -s "$DB_FILE" ]; then',
     'sqlite3 "$DB_FILE" ".backup ''$BACKUP_FILE''"',
-    'cp "$DB_FILE" "$BACKUP_FILE"',
+    'command -v sqlite3 >/dev/null 2>&1 || fail "sqlite3 is required for a consistent SQLite backup."',
     'chmod 600 "$BACKUP_FILE"'
 )) {
     if (-not $bash.Contains($required)) {
         throw "Missing SQLite backup protection: $required"
     }
+}
+
+if ($bash -match '(?m)^[ \t]*cp\s+"\$DB_FILE"') {
+    throw "Raw copying of the live SQLite database is unsafe."
 }
 
 $secureCookies = [regex]::Matches($bash, '(?m)^SESSION_SECURE_COOKIE=[^\r\n]*')

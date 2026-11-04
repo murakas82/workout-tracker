@@ -76,6 +76,7 @@ class WorkoutExerciseSetsRequest extends FormRequest
         foreach ($dropRows as $index => $row) {
             if (! is_array($row)) {
                 $errors['drops.'.$index] = 'Drop sets need valid weight and reps.';
+
                 continue;
             }
 
@@ -91,11 +92,13 @@ class WorkoutExerciseSetsRequest extends FormRequest
 
             if ($weightValue === null || ! $this->isValidReps($reps)) {
                 $errors['drops.'.$index] = 'Drop sets need valid weight and reps.';
+
                 continue;
             }
 
             if ($exercise->unilateral && ! in_array($side, [WorkoutSet::SIDE_LEFT, WorkoutSet::SIDE_RIGHT], true)) {
                 $errors['drops.'.$index.'.side'] = 'Choose left or right for each drop set.';
+
                 continue;
             }
 
@@ -131,7 +134,7 @@ class WorkoutExerciseSetsRequest extends FormRequest
 
         $weight = (float) $weight;
 
-        return $weight >= 0 ? $weight : null;
+        return is_finite($weight) && $weight >= 0 && $weight <= 99999.99 ? $weight : null;
     }
 
     /**

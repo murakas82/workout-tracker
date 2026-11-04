@@ -6,11 +6,16 @@
         $existingSets = $exercise->sets;
         $previousWeight = $previous ? $progression->primaryWeight($previous->sets) : null;
         $workingInput = old('working', []);
+        $workingInput = is_array($workingInput) ? $workingInput : [];
         $dropInput = old('drops', $existingSets->where('set_type', 'drop')->values()->map(fn ($set) => [
             'side' => $set->side,
             'weight' => $progression->formatWeight((float) $set->weight),
             'reps' => $set->reps,
         ])->all());
+        $dropInput = array_map(
+            fn ($row) => is_array($row) ? array_map(fn ($value) => is_scalar($value) ? $value : '', $row) : [],
+            is_array($dropInput) ? array_values($dropInput) : [],
+        );
         $dropSlots = max(3, count($dropInput) + 3);
         $isLastUnfinished = $exercise->completed_at === null
             && $workout->exercises->where('position', '>', $exercise->position)->whereNull('completed_at')->isEmpty();
@@ -18,7 +23,7 @@
         $workingValue = function (?string $side, int $setNumber, string $field) use ($workingInput, $existingSets, $previousWeight, $exercise, $progression) {
             $path = $side === null ? $setNumber.'.'.$field : $side.'.'.$setNumber.'.'.$field;
             $oldValue = data_get($workingInput, $path);
-            if ($oldValue !== null) {
+            if (is_scalar($oldValue)) {
                 return $oldValue;
             }
 
@@ -74,7 +79,7 @@
             @endif
         </div>
 
-        <form method="POST" action="{{ route('workouts.exercises.save', [$workout, $exercise]) }}" class="active-workout-form">
+        <form id="workout-exercise-form" method="POST" action="{{ route('workouts.exercises.save', [$workout, $exercise]) }}" class="active-workout-form">
             @csrf
 
             @if ($exercise->unilateral)
@@ -149,28 +154,29 @@
                 </div>
             </div>
 
-            <div class="active-action-bar">
-                <div class="grid {{ $exercise->position > 1 && $canMoveLater ? 'grid-cols-2' : 'grid-cols-1' }} gap-2">
-                    @if ($exercise->position > 1)
-                        <a class="button-secondary button-compact" href="{{ route('workouts.exercise', [$workout, $exercise->position - 1]) }}">Previous</a>
-                    @endif
-
-                    @if ($canMoveLater)
-                        <form method="POST" action="{{ route('workouts.exercises.later', [$workout, $exercise]) }}">
-                            @csrf
-                            <button class="button-secondary button-compact w-full" type="submit">Later</button>
-                        </form>
-                    @endif
-
-                    @if ($exercise->position <= 1 && ! $canMoveLater)
-                        <span></span>
-                    @endif
-                </div>
-
-                <button class="button-primary button-compact" type="submit">
-                    {{ $isLastUnfinished ? 'Finish' : 'Done - Next' }}
-                </button>
-            </div>
         </form>
+
+        <div class="active-action-bar">
+            <div class="grid {{ $exercise->position > 1 && $canMoveLater ? 'grid-cols-2' : 'grid-cols-1' }} gap-2">
+                @if ($exercise->position > 1)
+                    <a class="button-secondary button-compact" href="{{ route('workouts.exercise', [$workout, $exercise->position - 1]) }}">Previous</a>
+                @endif
+
+                @if ($canMoveLater)
+                    <form method="POST" action="{{ route('workouts.exercises.later', [$workout, $exercise]) }}">
+                        @csrf
+                        <button class="button-secondary button-compact w-full" type="submit">Later</button>
+                    </form>
+                @endif
+
+                @if ($exercise->position <= 1 && ! $canMoveLater)
+                    <span></span>
+                @endif
+            </div>
+
+            <button class="button-primary button-compact" type="submit" form="workout-exercise-form">
+                {{ $isLastUnfinished ? 'Finish' : 'Done - Next' }}
+            </button>
+        </div>
     </section>
 @endsection

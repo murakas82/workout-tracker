@@ -51,6 +51,8 @@ try {
         @{ Name = 'database-wipe'; Source = $source.Replace('php artisan view:cache --ansi', "php artisan view:cache --ansi`nphp artisan db:wipe --force"); Error = 'must not seed or reset' },
         @{ Name = 'backup-missing'; Source = $source.Replace("`nbackup_database`n", "`n# backup omitted`n"); Error = 'backup must run before migrations' },
         @{ Name = 'backup-too-late'; Source = $source.Replace("`nbackup_database`n", "`n").Replace('php artisan migrate --force --ansi', "php artisan migrate --force --ansi`nbackup_database"); Error = 'backup must run before migrations' },
+        @{ Name = 'raw-backup-copy'; Source = $source.Replace('chmod 600 "$BACKUP_FILE"', "cp `"`$DB_FILE`" `"`$BACKUP_FILE`"`n    chmod 600 `"`$BACKUP_FILE`""); Error = 'Raw copying' },
+        @{ Name = 'sqlite-check-missing'; Source = $source.Replace('command -v sqlite3 >/dev/null 2>&1 || fail "sqlite3 is required for a consistent SQLite backup."', 'true'); Error = 'Missing SQLite backup protection' },
         @{ Name = 'secure-cookie-disabled'; Source = $source.Replace('SESSION_SECURE_COOKIE=true', 'SESSION_SECURE_COOKIE=false'); Error = 'enable secure session cookies' },
         @{ Name = 'preflight-missing'; Source = $source.Replace("`nInvoke-DeploymentPreflight`n", "`n# preflight omitted`n"); Error = 'preflight must run before' },
         @{ Name = 'preflight-too-late'; Source = $source.Replace("`nInvoke-DeploymentPreflight`n", "`n").Replace("`nPush-Code`n", "`nPush-Code`nInvoke-DeploymentPreflight`n"); Error = 'preflight must run before' },

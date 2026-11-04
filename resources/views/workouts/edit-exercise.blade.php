@@ -5,16 +5,21 @@
         $progression = app(\App\Services\ProgressionService::class);
         $existingSets = $exercise->sets;
         $workingInput = old('working', []);
+        $workingInput = is_array($workingInput) ? $workingInput : [];
         $dropInput = old('drops', $existingSets->where('set_type', 'drop')->values()->map(fn ($set) => [
             'side' => $set->side,
             'weight' => $progression->formatWeight((float) $set->weight),
             'reps' => $set->reps,
         ])->all());
+        $dropInput = array_map(
+            fn ($row) => is_array($row) ? array_map(fn ($value) => is_scalar($value) ? $value : '', $row) : [],
+            is_array($dropInput) ? array_values($dropInput) : [],
+        );
         $dropSlots = max(3, count($dropInput) + 3);
         $workingValue = function (?string $side, int $setNumber, string $field) use ($workingInput, $existingSets, $progression) {
             $path = $side === null ? $setNumber.'.'.$field : $side.'.'.$setNumber.'.'.$field;
             $oldValue = data_get($workingInput, $path);
-            if ($oldValue !== null) {
+            if (is_scalar($oldValue)) {
                 return $oldValue;
             }
 
