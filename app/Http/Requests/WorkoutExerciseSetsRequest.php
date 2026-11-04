@@ -29,28 +29,31 @@ class WorkoutExerciseSetsRequest extends FormRequest
     {
         $errors = [];
         $sets = [];
-        $working = $this->input('working', []);
+        $working = $this->arrayInput('working');
         $sides = $exercise->unilateral ? [WorkoutSet::SIDE_LEFT, WorkoutSet::SIDE_RIGHT] : [null];
 
         foreach ($sides as $side) {
             for ($setNumber = 1; $setNumber <= $exercise->working_sets; $setNumber++) {
-                $row = $side === null
-                    ? data_get($working, (string) $setNumber, [])
-                    : data_get($working, $side.'.'.$setNumber, []);
+                $key = $side === null ? (string) $setNumber : $side.'.'.$setNumber;
+                $row = data_get($working, $key);
+                $row = is_array($row) ? $row : [];
 
                 $weightValue = $this->normalizeWeight($row['weight'] ?? null);
                 $reps = $row['reps'] ?? null;
                 $label = $side ? ucfirst($side).' set '.$setNumber : 'Set '.$setNumber;
+                $rowValid = true;
 
                 if ($weightValue === null) {
-                    $errors['working'] = $label.' needs a valid weight.';
+                    $errors['working.'.$key.'.weight'] = $label.' needs a valid weight.';
+                    $rowValid = false;
                 }
 
-                if (! ctype_digit((string) $reps) || (int) $reps < 1) {
-                    $errors['working'] = $label.' needs valid reps.';
+                if (! $this->isValidReps($reps)) {
+                    $errors['working.'.$key.'.reps'] = $label.' needs valid reps.';
+                    $rowValid = false;
                 }
 
-                if (! $errors) {
+                if ($rowValid) {
                     $sets[] = [
                         'set_number' => $setNumber,
                         'side' => $side,
@@ -65,7 +68,17 @@ class WorkoutExerciseSetsRequest extends FormRequest
         $dropRows = $this->input('drops', []);
         $dropNumber = 1;
 
-        foreach ($dropRows as $row) {
+        if (! is_array($dropRows)) {
+            $errors['drops'] = 'Drop sets need valid weight and reps.';
+            $dropRows = [];
+        }
+
+        foreach ($dropRows as $index => $row) {
+            if (! is_array($row)) {
+                $errors['drops.'.$index] = 'Drop sets need valid weight and reps.';
+                continue;
+            }
+
             $weight = $row['weight'] ?? null;
             $reps = $row['reps'] ?? null;
             $side = $exercise->unilateral ? ($row['side'] ?? null) : null;
@@ -76,13 +89,13 @@ class WorkoutExerciseSetsRequest extends FormRequest
 
             $weightValue = $this->normalizeWeight($weight);
 
-            if ($weightValue === null || ! ctype_digit((string) $reps) || (int) $reps < 1) {
-                $errors['drops'] = 'Drop sets need valid weight and reps.';
+            if ($weightValue === null || ! $this->isValidReps($reps)) {
+                $errors['drops.'.$index] = 'Drop sets need valid weight and reps.';
                 continue;
             }
 
             if ($exercise->unilateral && ! in_array($side, [WorkoutSet::SIDE_LEFT, WorkoutSet::SIDE_RIGHT], true)) {
-                $errors['drops'] = 'Choose left or right for each drop set.';
+                $errors['drops.'.$index.'.side'] = 'Choose left or right for each drop set.';
                 continue;
             }
 
@@ -119,6 +132,21 @@ class WorkoutExerciseSetsRequest extends FormRequest
         $weight = (float) $weight;
 
         return $weight >= 0 ? $weight : null;
+    }
+
+    /**
+     * @return array<array-key, mixed>
+     */
+    private function arrayInput(string $key): array
+    {
+        $value = $this->input($key, []);
+
+        return is_array($value) ? $value : [];
+    }
+
+    private function isValidReps(mixed $reps): bool
+    {
+        return (is_int($reps) || is_string($reps)) && ctype_digit((string) $reps) && (int) $reps >= 1;
     }
 
     private function isBlankInput(mixed $value): bool

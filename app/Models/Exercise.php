@@ -26,6 +26,8 @@ class Exercise extends Model
     protected function casts(): array
     {
         return [
+            'workout_type_id' => 'integer',
+            'sort_order' => 'integer',
             'unilateral' => 'boolean',
             'active' => 'boolean',
             'archived_at' => 'datetime',

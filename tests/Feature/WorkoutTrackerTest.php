@@ -7,6 +7,7 @@ use App\Models\User;
 use App\Models\Workout;
 use App\Models\WorkoutExercise;
 use App\Models\WorkoutSet;
+use App\Models\WorkoutTemplate;
 use App\Models\WorkoutType;
 use App\Services\ProgressionService;
 use App\Services\WorkoutStatsService;
@@ -222,6 +223,152 @@ class WorkoutTrackerTest extends TestCase
             ->assertNotFound();
     }
 
+    public function test_cancelled_workout_does_not_show_live_exercise_screen(): void
+    {
+        $user = User::factory()->create();
+        $session = app(WorkoutSessionService::class);
+        $workout = $session->start($user, WorkoutType::query()->where('code', 'push')->first());
+        $session->cancel($workout);
+
+        $this->actingAs($user)
+            ->get(route('workouts.show', $workout))
+            ->assertNotFound();
+    }
+
+    public function test_malformed_set_input_returns_validation_errors_not_server_error(): void
+    {
+        $user = User::factory()->create();
+        $workout = app(WorkoutSessionService::class)->start($user, WorkoutType::query()->where('code', 'push')->first());
+        $exercise = $workout->exercises()->first();
+        $validWorking = [
+            1 => ['weight' => 70, 'reps' => 8],
+            2 => ['weight' => 70, 'reps' => 8],
+            3 => ['weight' => 70, 'reps' => 8],
+        ];
+
+        $this->actingAs($user)
+            ->post(route('workouts.exercises.save', [$workout, $exercise]), ['working' => 'abc'])
+            ->assertSessionHasErrors('working.1.weight');
+
+        $this->actingAs($user)
+            ->post(route('workouts.exercises.save', [$workout, $exercise]), ['working' => $validWorking, 'drops' => 'abc'])
+            ->assertSessionHasErrors('drops');
+
+        $this->actingAs($user)
+            ->post(route('workouts.exercises.save', [$workout, $exercise]), ['working' => $validWorking, 'drops' => [5]])
+            ->assertSessionHasErrors('drops.0');
+
+        $this->assertNull($exercise->refresh()->completed_at);
+    }
+
+    public function test_every_invalid_working_set_is_reported(): void
+    {
+        $user = User::factory()->create();
+        $workout = app(WorkoutSessionService::class)->start($user, WorkoutType::query()->where('code', 'push')->first());
+        $exercise = $workout->exercises()->first();
+
+        $this->actingAs($user)
+            ->post(route('workouts.exercises.save', [$workout, $exercise]), [
+                'working' => [
+                    1 => ['weight' => '', 'reps' => 0],
+                    2 => ['weight' => 70, 'reps' => 8],
+                    3 => ['weight' => 70, 'reps' => 0],
+                ],
+            ])
+            ->assertSessionHasErrors(['working.1.weight', 'working.1.reps', 'working.3.reps'])
+            ->assertSessionDoesntHaveErrors(['working.2.weight', 'working.2.reps']);
+    }
+
+    public function test_workout_starts_after_archiving_first_exercise(): void
+    {
+        $user = User::factory()->create();
+        $push = WorkoutType::query()->where('code', 'push')->firstOrFail();
+        $first = Exercise::query()->where('workout_type_id', $push->id)->where('sort_order', 1)->firstOrFail();
+
+        $this->actingAs($user)->patch(route('settings.exercises.archive', $first));
+
+        $this->assertSame(range(1, 6), $this->pushOrder()->pluck('sort_order')->all());
+
+        $this->actingAs($user)->post(route('workouts.start', $push));
+        $workout = Workout::query()->where('user_id', $user->id)->latest('id')->firstOrFail();
+
+        $this->assertSame(range(1, 6), $workout->exercises()->orderBy('position')->pluck('position')->all());
+        $this->actingAs($user)
+            ->get(route('workouts.show', $workout))
+            ->assertOk()
+            ->assertSee('Exercise 1 of 6');
+    }
+
+    public function test_new_exercise_with_taken_order_number_is_inserted_at_that_slot(): void
+    {
+        $user = User::factory()->create();
+        $push = WorkoutType::query()->where('code', 'push')->firstOrFail();
+        $before = $this->pushOrder()->pluck('name')->all();
+
+        $this->actingAs($user)->post(route('settings.exercises.store'), [
+            'workout_type_id' => $push->id,
+            'name' => 'Dips',
+            'sort_order' => 2,
+            'working_sets' => 3,
+            'min_reps' => 8,
+            'max_reps' => 12,
+        ])->assertRedirect(route('settings.index'));
+
+        array_splice($before, 1, 0, 'Dips');
+        $this->assertSame($before, $this->pushOrder()->pluck('name')->all());
+        $this->assertSame(range(1, 8), $this->pushOrder()->pluck('sort_order')->all());
+
+        $this->actingAs($user)->post(route('workouts.start', $push))->assertRedirect();
+        $workout = Workout::query()->where('user_id', $user->id)->latest('id')->firstOrFail();
+
+        $this->assertSame($before, $workout->exercises()->orderBy('position')->pluck('name')->all());
+    }
+
+    public function test_moving_exercise_down_puts_it_at_the_requested_slot(): void
+    {
+        $user = User::factory()->create();
+        $push = WorkoutType::query()->where('code', 'push')->firstOrFail();
+        $order = $this->pushOrder();
+        $moved = $order[1];
+
+        $this->actingAs($user)->put(route('settings.exercises.update', $moved), [
+            'workout_type_id' => $push->id,
+            'name' => $moved->name,
+            'muscle_group' => $moved->muscle_group,
+            'sort_order' => 5,
+            'working_sets' => $moved->working_sets,
+            'min_reps' => $moved->min_reps,
+            'max_reps' => $moved->max_reps,
+            'unilateral' => $moved->unilateral ? 1 : 0,
+            'active' => 1,
+        ])->assertRedirect(route('settings.index'));
+
+        $expected = $order->pluck('name')->all();
+        array_splice($expected, 1, 1);
+        array_splice($expected, 4, 0, $moved->name);
+
+        $this->assertSame($expected, $this->pushOrder()->pluck('name')->all());
+        $this->assertSame(5, $moved->refresh()->sort_order);
+    }
+
+    public function test_workout_start_numbers_exercises_consecutively_even_with_messy_template(): void
+    {
+        $user = User::factory()->create();
+        $push = WorkoutType::query()->where('code', 'push')->firstOrFail();
+        $template = WorkoutTemplate::query()->where('workout_type_id', $push->id)->firstOrFail();
+
+        // Simulate legacy data: a gap and a duplicate position.
+        $links = $template->templateExercises()->get();
+        $links[0]->forceFill(['position' => 3])->save();
+        $links[1]->forceFill(['position' => 3])->save();
+        $links[2]->forceFill(['position' => 9])->save();
+
+        $workout = app(WorkoutSessionService::class)->start($user, $push);
+
+        $this->assertSame(range(1, 7), $workout->exercises->pluck('position')->all());
+        $this->actingAs($user)->get(route('workouts.show', $workout))->assertOk();
+    }
+
     public function test_completed_workout_cannot_be_changed_as_active_workout(): void
     {
         $user = User::factory()->create();
@@ -349,7 +496,8 @@ class WorkoutTrackerTest extends TestCase
         $chartData = $stats->chartData($workout);
 
         $this->assertSame(7, $summary['exercises_completed']);
-        $this->assertSame(21, $summary['working_sets_completed']);
+        // 7 exercises x 3 sets, plus 3 extra for the right side of the unilateral Single-Arm Cable Lateral Raise.
+        $this->assertSame(24, $summary['working_sets_completed']);
         $this->assertGreaterThan(0, $summary['total_volume']);
         $this->assertNotNull($summary['heaviest_set']);
         $this->assertCount(7, $summary['per_exercise']);
@@ -418,6 +566,18 @@ class WorkoutTrackerTest extends TestCase
         $this->completeWorkout($user, 'pull');
 
         $this->assertSame('push', app(WorkoutRotationService::class)->nextFor($user)->code);
+    }
+
+    /**
+     * @return \Illuminate\Support\Collection<int, Exercise>
+     */
+    private function pushOrder(): \Illuminate\Support\Collection
+    {
+        return Exercise::query()
+            ->whereHas('workoutType', fn ($query) => $query->where('code', 'push'))
+            ->where('active', true)
+            ->orderBy('sort_order')
+            ->get();
     }
 
     private function completeWorkout(User $user, string $code): Workout

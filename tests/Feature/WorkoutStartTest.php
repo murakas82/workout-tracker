@@ -204,13 +204,14 @@ class WorkoutStartTest extends TestCase
     public function test_unrelated_unique_constraint_errors_are_not_swallowed(): void
     {
         $user = User::factory()->create();
-        $type = WorkoutType::query()->firstOrFail();
-        $template = WorkoutTemplate::query()->where('workout_type_id', $type->id)->firstOrFail();
-        DB::table('workout_template_exercises')->where('workout_template_id', $template->id)->update(['position' => 1]);
+        $type = WorkoutType::query()->where('code', 'push')->firstOrFail();
+        // Start renumbers positions, so force an unrelated violation instead: the push
+        // template has several Chest exercises.
+        DB::statement('CREATE UNIQUE INDEX test_one_exercise_per_muscle_group ON workout_exercises (workout_id, muscle_group)');
 
         $this->assertThrows(
             fn () => app(WorkoutSessionService::class)->start($user, $type),
-            fn (UniqueConstraintViolationException $exception) => $exception->columns === ['workout_id', 'position'],
+            fn (UniqueConstraintViolationException $exception) => $exception->columns === ['workout_id', 'muscle_group'],
         );
 
         $this->assertDatabaseCount('workouts', 0);

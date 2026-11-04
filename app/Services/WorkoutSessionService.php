@@ -39,6 +39,10 @@ class WorkoutSessionService
                     ->with('templateExercises.exercise')
                     ->firstOrFail();
 
+                // Number workout exercises 1..n in template order. Template positions can have
+                // gaps (archived exercises) or duplicates, but navigation expects consecutive positions.
+                $position = 0;
+
                 foreach ($template->templateExercises as $templateExercise) {
                     $exercise = $templateExercise->exercise;
 
@@ -49,7 +53,7 @@ class WorkoutSessionService
                     WorkoutExercise::query()->create([
                         'workout_id' => $workout->id,
                         'exercise_id' => $exercise->id,
-                        'position' => $templateExercise->position,
+                        'position' => ++$position,
                         'name' => $exercise->name,
                         'muscle_group' => $exercise->muscle_group,
                         'working_sets' => $exercise->working_sets,

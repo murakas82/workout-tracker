@@ -8,6 +8,7 @@ use App\Models\WorkoutTemplateExercise;
 use App\Models\WorkoutType;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use Illuminate\View\View;
 
@@ -40,8 +41,12 @@ class SettingsController extends Controller
 
     public function store(Request $request): RedirectResponse
     {
-        $exercise = Exercise::query()->create($this->validatedExercise($request));
-        $this->syncTemplate($exercise);
+        $data = $this->validatedExercise($request);
+
+        DB::transaction(function () use ($data): void {
+            $exercise = Exercise::query()->create($data);
+            $this->resequence($exercise->workout_type_id, $exercise, movingDown: false);
+        });
 
         return redirect()->route('settings.index')->with('status', 'Exercise created.');
     }
@@ -56,20 +61,35 @@ class SettingsController extends Controller
 
     public function update(Request $request, Exercise $exercise): RedirectResponse
     {
-        $exercise->update($this->validatedExercise($request));
-        $this->syncTemplate($exercise);
+        $data = $this->validatedExercise($request);
+
+        DB::transaction(function () use ($exercise, $data): void {
+            $oldTypeId = $exercise->workout_type_id;
+            $oldSortOrder = $exercise->sort_order;
+
+            $exercise->update($data);
+
+            $movingDown = $exercise->workout_type_id === $oldTypeId && $exercise->sort_order > $oldSortOrder;
+            $this->resequence($exercise->workout_type_id, $exercise, $movingDown);
+
+            if ($exercise->workout_type_id !== $oldTypeId) {
+                $this->resequence($oldTypeId);
+            }
+        });
 
         return redirect()->route('settings.index')->with('status', 'Exercise updated. Existing workout history was not changed.');
     }
 
     public function archive(Exercise $exercise): RedirectResponse
     {
-        $exercise->forceFill([
-            'active' => false,
-            'archived_at' => now(),
-        ])->save();
+        DB::transaction(function () use ($exercise): void {
+            $exercise->forceFill([
+                'active' => false,
+                'archived_at' => now(),
+            ])->save();
 
-        WorkoutTemplateExercise::query()->where('exercise_id', $exercise->id)->delete();
+            $this->resequence($exercise->workout_type_id);
+        });
 
         return redirect()->route('settings.index')->with('status', 'Exercise archived.');
     }
@@ -97,16 +117,49 @@ class SettingsController extends Controller
         ];
     }
 
-    private function syncTemplate(Exercise $exercise): void
+    /**
+     * Renumber a workout type's active exercises 1..n and rebuild its template to match.
+     *
+     * When $changed shares an order number with another exercise, it takes that exact slot:
+     * it goes before the other exercise, or after it when it was moved down the list.
+     */
+    private function resequence(int $workoutTypeId, ?Exercise $changed = null, bool $movingDown = false): void
     {
-        WorkoutTemplateExercise::query()->where('exercise_id', $exercise->id)->delete();
+        $exercises = Exercise::query()
+            ->where('workout_type_id', $workoutTypeId)
+            ->where('active', true)
+            ->get()
+            ->sort(function (Exercise $a, Exercise $b) use ($changed, $movingDown): int {
+                if ($a->sort_order !== $b->sort_order) {
+                    return $a->sort_order <=> $b->sort_order;
+                }
 
-        if (! $exercise->active) {
-            return;
+                if ($changed && ($a->is($changed) || $b->is($changed))) {
+                    $changedFirst = $a->is($changed) ? -1 : 1;
+
+                    return $movingDown ? -$changedFirst : $changedFirst;
+                }
+
+                return $a->id <=> $b->id;
+            })
+            ->values();
+
+        foreach ($exercises as $index => $exercise) {
+            if ($exercise->sort_order !== $index + 1) {
+                $exercise->forceFill(['sort_order' => $index + 1])->save();
+            }
         }
 
+        $templateIds = WorkoutTemplate::query()
+            ->where('workout_type_id', $workoutTypeId)
+            ->pluck('id');
+
+        // Drop every template link for this type's exercises (including inactive ones), then
+        // link the active ones to the active template in order.
+        WorkoutTemplateExercise::query()->whereIn('workout_template_id', $templateIds)->delete();
+
         $template = WorkoutTemplate::query()
-            ->where('workout_type_id', $exercise->workout_type_id)
+            ->where('workout_type_id', $workoutTypeId)
             ->where('active', true)
             ->first();
 
@@ -114,10 +167,12 @@ class SettingsController extends Controller
             return;
         }
 
-        WorkoutTemplateExercise::query()->create([
-            'workout_template_id' => $template->id,
-            'exercise_id' => $exercise->id,
-            'position' => $exercise->sort_order,
-        ]);
+        foreach ($exercises as $index => $exercise) {
+            WorkoutTemplateExercise::query()->create([
+                'workout_template_id' => $template->id,
+                'exercise_id' => $exercise->id,
+                'position' => $index + 1,
+            ]);
+        }
     }
 }

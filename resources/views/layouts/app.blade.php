@@ -43,7 +43,9 @@
 
                 @if ($errors->any())
                     <div class="mb-4 rounded-lg border border-red-400/30 bg-red-500/10 p-3 text-sm font-semibold text-red-100">
-                        {{ $errors->first() }}
+                        @foreach (array_unique($errors->all()) as $message)
+                            <p>{{ $message }}</p>
+                        @endforeach
                     </div>
                 @endif
 

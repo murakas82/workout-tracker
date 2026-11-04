@@ -22,6 +22,6 @@ class WorkoutTemplate extends Model
 
     public function templateExercises(): HasMany
     {
-        return $this->hasMany(WorkoutTemplateExercise::class)->orderBy('position');
+        return $this->hasMany(WorkoutTemplateExercise::class)->orderBy('position')->orderBy('id');
     }
 }
