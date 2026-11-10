@@ -18,7 +18,7 @@
                         <div class="flex items-start justify-between gap-3">
                             <div>
                                 <h3 class="font-black {{ $exercise->active ? 'text-zinc-50' : 'text-zinc-500' }}">{{ $exercise->name }}</h3>
-                                <p class="text-sm text-zinc-400">{{ $exercise->working_sets }} x {{ $exercise->min_reps }}-{{ $exercise->max_reps }} | {{ $exercise->muscle_group }}</p>
+                                <p class="text-sm text-zinc-400">{{ $exercise->working_sets }} x {{ $exercise->min_reps }}-{{ $exercise->max_reps }} | {{ $exercise->muscle_group }}@if ($exercise->weight_increment) | +{{ app(\App\Services\ProgressionService::class)->formatWeight($exercise->weight_increment) }} kg @endif</p>
                                 @if ($exercise->unilateral)
                                     <p class="text-xs font-black uppercase text-amber-300">Unilateral</p>
                                 @endif

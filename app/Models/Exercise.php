@@ -18,6 +18,7 @@ class Exercise extends Model
         'max_reps',
         'rest_min_seconds',
         'rest_max_seconds',
+        'weight_increment',
         'unilateral',
         'active',
         'archived_at',
@@ -28,6 +29,7 @@ class Exercise extends Model
         return [
             'workout_type_id' => 'integer',
             'sort_order' => 'integer',
+            'weight_increment' => 'float',
             'unilateral' => 'boolean',
             'active' => 'boolean',
             'archived_at' => 'datetime',

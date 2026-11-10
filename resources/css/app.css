@@ -95,6 +95,38 @@
         @apply flex items-center gap-3 rounded-lg border border-zinc-800 bg-zinc-900/70 px-3 py-2;
     }
 
+    .input-suggested {
+        @apply border-lime-400/60 bg-lime-400/5;
+    }
+
+    .rest-timer {
+        @apply flex items-center gap-2 rounded-lg border border-zinc-800 bg-zinc-900/70 px-3 py-2 transition-colors;
+    }
+
+    .rest-timer[data-phase='ready'] {
+        @apply border-lime-400/60 bg-lime-400/10;
+    }
+
+    .rest-timer[data-phase='over'] {
+        @apply border-amber-400/70 bg-amber-400/10;
+    }
+
+    .rest-timer-clock {
+        @apply text-2xl font-black tabular-nums text-zinc-50;
+    }
+
+    .rest-timer-phase {
+        @apply text-xs font-black uppercase text-zinc-400;
+    }
+
+    .rest-timer[data-phase='ready'] .rest-timer-phase {
+        @apply text-lime-300;
+    }
+
+    .rest-timer[data-phase='over'] .rest-timer-phase {
+        @apply text-amber-300;
+    }
+
     .active-set-row {
         @apply grid items-center gap-2;
         grid-template-columns: 2rem 1fr 1fr;

@@ -45,7 +45,7 @@ class WorkoutController extends Controller
         return $response;
     }
 
-    public function show(Request $request, Workout $workout, ?int $position = null): View|RedirectResponse
+    public function show(Request $request, ProgressionService $progression, Workout $workout, ?int $position = null): View|RedirectResponse
     {
         Gate::authorize('view', $workout);
 
@@ -63,10 +63,14 @@ class WorkoutController extends Controller
         $exercise = $workout->exercises->firstWhere('position', $position);
         abort_unless($exercise, 404);
 
+        $previous = $this->previousExercise($request, $exercise, $workout);
+        $exercise->loadMissing('exercise');
+
         return view('workouts.show', [
             'workout' => $workout,
             'exercise' => $exercise,
-            'previous' => $this->previousExercise($request, $exercise, $workout),
+            'previous' => $previous,
+            'suggestedWeight' => $progression->suggestedWeight($previous, $exercise->exercise?->weight_increment),
             'totalExercises' => $workout->exercises->count(),
         ]);
     }

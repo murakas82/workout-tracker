@@ -64,6 +64,12 @@
                 </div>
             </div>
 
+            <div class="space-y-2">
+                <label for="weight_increment">Weight step kg</label>
+                <input id="weight_increment" name="weight_increment" value="{{ old('weight_increment', $exercise->weight_increment !== null ? app(\App\Services\ProgressionService::class)->formatWeight($exercise->weight_increment) : '') }}" inputmode="decimal" type="number" min="0" max="100" step="0.01" aria-describedby="weight_increment_help">
+                <p id="weight_increment_help" class="text-xs text-zinc-500">Added to the suggested weight after you reach the rep target. Leave empty or 0 to keep the same weight.</p>
+            </div>
+
             <input type="hidden" name="active" value="0">
             <label class="flex items-center gap-3 rounded-lg border border-zinc-800 bg-zinc-900 p-3">
                 <input class="h-5 w-5" type="checkbox" name="active" value="1" @checked(old('active', $exercise->active ?? true))>

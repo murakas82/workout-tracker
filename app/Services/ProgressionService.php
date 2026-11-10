@@ -101,6 +101,25 @@ class ProgressionService
         return $set ? (float) $set->weight : null;
     }
 
+    /**
+     * The weight to start with after a session that reached the progression target,
+     * or null when the previous weight should be kept.
+     */
+    public function suggestedWeight(?WorkoutExercise $previous, ?float $increment): ?float
+    {
+        if ($previous === null || $previous->progression_result !== self::RESULT_INCREASE || ! $increment || $increment <= 0) {
+            return null;
+        }
+
+        $previousWeight = $this->primaryWeight($previous->sets);
+
+        if ($previousWeight === null) {
+            return null;
+        }
+
+        return min(round($previousWeight + $increment, 2), (float) WorkoutSet::MAX_WEIGHT);
+    }
+
     public function formatWeight(float|int|null $weight): string
     {
         if ($weight === null) {

@@ -33,6 +33,7 @@ class SettingsController extends Controller
                 'max_reps' => 12,
                 'rest_min_seconds' => 60,
                 'rest_max_seconds' => 90,
+                'weight_increment' => 2.5,
                 'active' => true,
             ]),
             'types' => WorkoutType::query()->orderBy('sort_order')->get(),
@@ -99,6 +100,11 @@ class SettingsController extends Controller
      */
     private function validatedExercise(Request $request): array
     {
+        if (is_string($request->input('weight_increment'))) {
+            $increment = str_replace(',', '.', trim($request->input('weight_increment')));
+            $request->merge(['weight_increment' => $increment === '' ? null : $increment]);
+        }
+
         return $request->validate([
             'workout_type_id' => ['required', Rule::exists('workout_types', 'id')],
             'name' => ['required', 'string', 'max:255'],
@@ -109,6 +115,7 @@ class SettingsController extends Controller
             'max_reps' => ['required', 'integer', 'gte:min_reps', 'max:100'],
             'rest_min_seconds' => ['nullable', 'integer', 'min:0', 'max:1800'],
             'rest_max_seconds' => ['nullable', 'integer', 'gte:rest_min_seconds', 'max:1800'],
+            'weight_increment' => ['nullable', 'numeric', 'min:0', 'max:100', 'decimal:0,2'],
             'unilateral' => ['sometimes', 'boolean'],
             'active' => ['sometimes', 'boolean'],
         ]) + [

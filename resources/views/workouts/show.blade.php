@@ -5,6 +5,7 @@
         $progression = app(\App\Services\ProgressionService::class);
         $existingSets = $exercise->sets;
         $previousWeight = $previous ? $progression->primaryWeight($previous->sets) : null;
+        $prefillWeight = $suggestedWeight ?? $previousWeight;
         $dropInput = \App\Http\Requests\WorkoutExerciseSetsRequest::oldDropRows($existingSets->where('set_type', 'drop')->values()->map(fn ($set) => [
             'side' => $set->side,
             'weight' => $progression->formatWeight((float) $set->weight),
@@ -14,7 +15,7 @@
         $isLastUnfinished = $exercise->completed_at === null
             && $workout->exercises->where('position', '>', $exercise->position)->whereNull('completed_at')->isEmpty();
         $canMoveLater = $exercise->completed_at === null && ! $isLastUnfinished;
-        $workingValue = function (?string $side, int $setNumber, string $field) use ($existingSets, $previousWeight, $exercise, $progression) {
+        $enteredValue = function (?string $side, int $setNumber, string $field) use ($existingSets, $progression) {
             $oldValue = \App\Http\Requests\WorkoutExerciseSetsRequest::oldWorkingValue($side, $setNumber, $field);
             if ($oldValue !== null) {
                 return $oldValue;
@@ -30,12 +31,20 @@
                 return $field === 'weight' ? $progression->formatWeight((float) $set->weight) : $set->reps;
             }
 
-            if ($field === 'weight' && $previousWeight !== null) {
-                return $progression->formatWeight($previousWeight);
+            return null;
+        };
+        $workingValue = function (?string $side, int $setNumber, string $field) use ($enteredValue, $prefillWeight, $progression) {
+            $value = $enteredValue($side, $setNumber, $field);
+
+            if ($value !== null) {
+                return $value;
             }
 
-            return '';
+            return $field === 'weight' && $prefillWeight !== null ? $progression->formatWeight($prefillWeight) : '';
         };
+        $weightClass = fn (?string $side, int $setNumber) => $suggestedWeight !== null && $enteredValue($side, $setNumber, 'weight') === null
+            ? 'input-compact input-suggested'
+            : 'input-compact';
     @endphp
 
     <section class="active-workout-screen">
@@ -72,6 +81,31 @@
             @endif
         </div>
 
+        @if ($suggestedWeight !== null)
+            <p class="rounded-lg border border-lime-400/40 bg-lime-400/10 px-3 py-2 text-sm font-bold text-lime-100">
+                Try {{ $progression->formatWeight($suggestedWeight) }} kg today
+                <span class="text-lime-300/80">(+{{ $progression->formatWeight($suggestedWeight - $previousWeight) }} kg)</span>
+            </p>
+        @endif
+
+        <div
+            class="rest-timer"
+            x-data="restTimer({ workoutId: {{ $workout->id }}, min: @js($exercise->rest_min_seconds), max: @js($exercise->rest_max_seconds) })"
+            x-on:change.window="onInputChange($event)"
+            x-bind:data-phase="running ? phase : 'idle'"
+        >
+            <div class="min-w-0 flex-1">
+                <p class="text-xs font-black uppercase text-zinc-500" x-text="targetLabel">{{ $exercise->restLabel() }}</p>
+                <p class="flex items-baseline gap-2" x-show="running" x-cloak>
+                    <span class="rest-timer-clock" x-text="display" aria-live="off"></span>
+                    <span class="rest-timer-phase" x-text="phaseLabel" aria-live="polite"></span>
+                </p>
+                <p class="text-xs text-zinc-400" x-show="!running">Starts when you enter reps.</p>
+            </div>
+            <button class="button-secondary button-compact w-auto" type="button" x-on:click="start()" x-text="running ? 'Restart' : 'Start'">Start</button>
+            <button class="button-secondary button-compact w-auto" type="button" x-on:click="stop()" x-show="running" x-cloak>Stop</button>
+        </div>
+
         <form id="workout-exercise-form" method="POST" action="{{ route('workouts.exercises.save', [$workout, $exercise]) }}" class="active-workout-form">
             @csrf
 
@@ -84,11 +118,11 @@
                                 <p class="set-number">{{ $set }}</p>
                                 <div>
                                     <label class="sr-only" for="working_{{ $side }}_{{ $set }}_weight">{{ $label }} set {{ $set }} weight</label>
-                                    <input class="input-compact" id="working_{{ $side }}_{{ $set }}_weight" name="working[{{ $side }}][{{ $set }}][weight]" value="{{ $workingValue($side, $set, 'weight') }}" placeholder="Weight" inputmode="decimal" type="number" max="{{ \App\Models\WorkoutSet::MAX_WEIGHT }}" min="0" step="0.01" {{ $set === 1 ? 'data-copy-source=weight data-copy-group='.$side : 'data-copy-target='.$side }}>
+                                    <input class="{{ $weightClass($side, $set) }}" id="working_{{ $side }}_{{ $set }}_weight" name="working[{{ $side }}][{{ $set }}][weight]" value="{{ $workingValue($side, $set, 'weight') }}" placeholder="Weight" inputmode="decimal" type="number" max="{{ \App\Models\WorkoutSet::MAX_WEIGHT }}" min="0" step="0.01" {{ $set === 1 ? 'data-copy-source=weight data-copy-group='.$side : 'data-copy-target='.$side }}>
                                 </div>
                                 <div>
                                     <label class="sr-only" for="working_{{ $side }}_{{ $set }}_reps">{{ $label }} set {{ $set }} reps</label>
-                                    <input class="input-compact" id="working_{{ $side }}_{{ $set }}_reps" name="working[{{ $side }}][{{ $set }}][reps]" value="{{ $workingValue($side, $set, 'reps') }}" placeholder="Reps" inputmode="numeric" type="number" max="{{ \App\Models\WorkoutSet::MAX_REPS }}" min="1" step="1">
+                                    <input class="input-compact" id="working_{{ $side }}_{{ $set }}_reps" name="working[{{ $side }}][{{ $set }}][reps]" value="{{ $workingValue($side, $set, 'reps') }}" placeholder="Reps" inputmode="numeric" type="number" max="{{ \App\Models\WorkoutSet::MAX_REPS }}" min="1" step="1" data-rest-trigger>
                                 </div>
                             </div>
                         @endfor
@@ -101,11 +135,11 @@
                             <p class="set-number">{{ $set }}</p>
                             <div>
                                 <label class="sr-only" for="working_{{ $set }}_weight">Set {{ $set }} weight</label>
-                                <input class="input-compact" id="working_{{ $set }}_weight" name="working[{{ $set }}][weight]" value="{{ $workingValue(null, $set, 'weight') }}" placeholder="Weight" inputmode="decimal" type="number" max="{{ \App\Models\WorkoutSet::MAX_WEIGHT }}" min="0" step="0.01" {{ $set === 1 ? 'data-copy-source=weight data-copy-group=main' : 'data-copy-target=main' }}>
+                                <input class="{{ $weightClass(null, $set) }}" id="working_{{ $set }}_weight" name="working[{{ $set }}][weight]" value="{{ $workingValue(null, $set, 'weight') }}" placeholder="Weight" inputmode="decimal" type="number" max="{{ \App\Models\WorkoutSet::MAX_WEIGHT }}" min="0" step="0.01" {{ $set === 1 ? 'data-copy-source=weight data-copy-group=main' : 'data-copy-target=main' }}>
                             </div>
                             <div>
                                 <label class="sr-only" for="working_{{ $set }}_reps">Set {{ $set }} reps</label>
-                                <input class="input-compact" id="working_{{ $set }}_reps" name="working[{{ $set }}][reps]" value="{{ $workingValue(null, $set, 'reps') }}" placeholder="Reps" inputmode="numeric" type="number" max="{{ \App\Models\WorkoutSet::MAX_REPS }}" min="1" step="1">
+                                <input class="input-compact" id="working_{{ $set }}_reps" name="working[{{ $set }}][reps]" value="{{ $workingValue(null, $set, 'reps') }}" placeholder="Reps" inputmode="numeric" type="number" max="{{ \App\Models\WorkoutSet::MAX_REPS }}" min="1" step="1" data-rest-trigger>
                             </div>
                         </div>
                     @endfor
@@ -140,7 +174,7 @@
                             </div>
                             <div>
                                 <label class="sr-only" for="drop_{{ $i }}_reps">Drop set {{ $i + 1 }} reps</label>
-                                <input class="input-compact" id="drop_{{ $i }}_reps" name="drops[{{ $i }}][reps]" value="{{ $drop['reps'] ?? '' }}" placeholder="Reps" inputmode="numeric" type="number" max="{{ \App\Models\WorkoutSet::MAX_REPS }}" min="1" step="1">
+                                <input class="input-compact" id="drop_{{ $i }}_reps" name="drops[{{ $i }}][reps]" value="{{ $drop['reps'] ?? '' }}" placeholder="Reps" inputmode="numeric" type="number" max="{{ \App\Models\WorkoutSet::MAX_REPS }}" min="1" step="1" data-rest-trigger>
                             </div>
                         </div>
                     @endfor

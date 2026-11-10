@@ -11,6 +11,7 @@ import {
     PointElement,
     Tooltip,
 } from 'chart.js';
+import { restTimer } from './rest-timer.js';
 
 Chart.register(
     BarController,
@@ -25,6 +26,7 @@ Chart.register(
 );
 
 window.Alpine = Alpine;
+Alpine.data('restTimer', restTimer);
 Alpine.start();
 
 let deferredInstallPrompt = null;
