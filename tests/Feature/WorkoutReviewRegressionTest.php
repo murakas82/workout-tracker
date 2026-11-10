@@ -102,6 +102,27 @@ class WorkoutReviewRegressionTest extends TestCase
         $this->assertSame('Enter reps for this drop set.', $response->json('errors')['drops.0'][0]);
     }
 
+    public function test_empty_drop_slots_stay_hidden_after_a_rejected_save(): void
+    {
+        [$workout, $exercise] = $this->startWorkout();
+        $working = $this->workingSets();
+        $working[2]['reps'] = '';
+        $url = route('workouts.show', $workout);
+        $emptySlots = [['weight' => '', 'reps' => ''], ['weight' => '', 'reps' => ''], ['weight' => '', 'reps' => '']];
+
+        $this->from($url)->post(route('workouts.exercises.save', [$workout, $exercise]), ['working' => $working, 'drops' => $emptySlots])
+            ->assertRedirect($url);
+        $this->get($url)->assertOk()->assertSee('x-data="{ open: false, drops: 0 }"', false);
+
+        $withOneDrop = $emptySlots;
+        $withOneDrop[1] = ['weight' => '20', 'reps' => '10'];
+        $this->from($url)->post(route('workouts.exercises.save', [$workout, $exercise]), ['working' => $working, 'drops' => $withOneDrop])
+            ->assertRedirect($url);
+        $this->get($url)->assertOk()
+            ->assertSee('x-data="{ open: true, drops: 1 }"', false)
+            ->assertSee('name="drops[0][weight]" value="20"', false);
+    }
+
     #[DataProvider('invalidReps')]
     public function test_invalid_reps_cannot_overflow_working_or_drop_sets(string $reps): void
     {

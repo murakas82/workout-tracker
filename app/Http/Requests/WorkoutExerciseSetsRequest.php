@@ -181,10 +181,16 @@ class WorkoutExerciseSetsRequest extends FormRequest
     {
         $rows = old('drops', $default);
 
-        return array_map(
+        $rows = array_map(
             fn ($row) => is_array($row) ? array_map(fn ($value) => is_scalar($value) ? $value : '', $row) : [],
             is_array($rows) ? array_values($rows) : [],
         );
+
+        // The form always submits its empty drop slots; only rows with something entered are drop sets.
+        return array_values(array_filter(
+            $rows,
+            fn (array $row) => collect($row)->contains(fn ($value) => trim((string) $value) !== ''),
+        ));
     }
 
     private function isBlankInput(mixed $value): bool
