@@ -95,6 +95,18 @@
         @apply flex items-center gap-3 rounded-lg border border-zinc-800 bg-zinc-900/70 px-3 py-2;
     }
 
+    .progress-badge {
+        @apply inline-flex shrink-0 rounded px-2 py-1 text-[11px] font-black uppercase;
+    }
+
+    .progress-badge-ready {
+        @apply bg-lime-400/15 text-lime-300;
+    }
+
+    .progress-badge-stalled {
+        @apply bg-amber-400/15 text-amber-300;
+    }
+
     .input-suggested {
         @apply border-lime-400/60 bg-lime-400/5;
     }

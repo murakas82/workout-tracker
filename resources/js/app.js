@@ -117,6 +117,8 @@ const chartColors = {
     total: '#f4f4f5',
 };
 
+const formatKg = (value) => `${Number(Number(value).toFixed(2))} kg`;
+
 const chartOptions = ({ stacked = false, horizontal = false } = {}) => ({
     indexAxis: horizontal ? 'y' : 'x',
     responsive: true,
@@ -229,6 +231,61 @@ const renderWorkoutCharts = () => {
                     ],
                 },
                 options: chartOptions({ stacked: true, horizontal: true }),
+            });
+        }
+
+        if (container.dataset.workoutChart === 'exercise-progress') {
+            const options = chartOptions();
+            options.scales.y.beginAtZero = false;
+            options.plugins.tooltip.callbacks.label = (context) => `${context.dataset.label}: ${formatKg(context.parsed.y)}`;
+            options.scales.y.ticks.callback = (value) => formatKg(value);
+
+            new Chart(canvas, {
+                type: 'line',
+                data: {
+                    labels: payload.labels,
+                    datasets: [
+                        {
+                            label: 'Est. 1-rep max',
+                            data: payload.estimated_max,
+                            borderColor: chartColors.drops,
+                            borderWidth: 2,
+                            pointBackgroundColor: chartColors.drops,
+                            pointRadius: 3,
+                            tension: 0.3,
+                            spanGaps: true,
+                        },
+                        {
+                            label: 'Working weight',
+                            data: payload.weight,
+                            borderColor: chartColors.working,
+                            borderWidth: 2,
+                            pointBackgroundColor: chartColors.working,
+                            pointRadius: 3,
+                            stepped: true,
+                            spanGaps: true,
+                        },
+                    ],
+                },
+                options,
+            });
+        }
+
+        if (container.dataset.workoutChart === 'exercise-volume-history') {
+            new Chart(canvas, {
+                type: 'bar',
+                data: {
+                    labels: payload.labels,
+                    datasets: [
+                        {
+                            label: 'Working volume',
+                            data: payload.volume,
+                            backgroundColor: chartColors.working,
+                            borderRadius: 4,
+                        },
+                    ],
+                },
+                options: chartOptions(),
             });
         }
 
