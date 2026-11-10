@@ -51,7 +51,9 @@ class WorkoutExerciseSetsRequest extends FormRequest
                 }
 
                 if (! $this->isValidReps($reps)) {
-                    $errors['working.'.$key.'.reps'] = $label.' reps must be a whole number between 1 and '.WorkoutSet::MAX_REPS.'.';
+                    $errors['working.'.$key.'.reps'] = $this->isBlankInput($reps)
+                        ? $label.' needs reps.'
+                        : $label.' reps must be a whole number between 1 and '.WorkoutSet::MAX_REPS.'.';
                     $rowValid = false;
                 }
 
@@ -101,7 +103,9 @@ class WorkoutExerciseSetsRequest extends FormRequest
             }
 
             if (! $this->isValidReps($reps)) {
-                $errors['drops.'.$index] = 'Drop set reps must be a whole number between 1 and '.WorkoutSet::MAX_REPS.'.';
+                $errors['drops.'.$index] = $this->isBlankInput($reps)
+                    ? 'Enter reps for this drop set.'
+                    : 'Drop set reps must be a whole number between 1 and '.WorkoutSet::MAX_REPS.'.';
 
                 continue;
             }
